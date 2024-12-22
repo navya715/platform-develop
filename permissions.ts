@@ -13,72 +13,88 @@
 // limitations under the License.
 //
 
-import { Session, systemPreferences } from 'electron'
-import log from 'electron-log'
+import { type Builder } from '@hcengineering/model'
 
-export function addPermissionHandlers (session: Session): void {
-  session.setPermissionRequestHandler((webContents, permission, result, details) => {
-    log.info('permissions requested: ', permission, details)
+import core from './component'
 
-    if (process.platform !== 'darwin') {
-      result(true)
-      return
-    }
+export function definePermissions (builder: Builder): void {
+  builder.createDoc(
+    core.class.Permission,
+    core.space.Model,
+    {
+      label: core.string.CreateObject,
+      description: core.string.CreateObjectDescription
+    },
+    core.permission.CreateObject
+  )
 
-    if (permission !== 'media') {
-      result(true)
-      return
-    }
+  builder.createDoc(
+    core.class.Permission,
+    core.space.Model,
+    {
+      label: core.string.UpdateObject,
+      description: core.string.UpdateObjectDescription
+    },
+    core.permission.UpdateObject
+  )
 
-    const audioGranted = (details as any).mediaTypes?.includes('audio') === true ? askForMediaAccess('microphone') : Promise.resolve(true)
-    const videoGranted = (details as any).mediaTypes?.includes('video') === true ? askForMediaAccess('camera') : Promise.resolve(true)
+  builder.createDoc(
+    core.class.Permission,
+    core.space.Model,
+    {
+      label: core.string.DeleteObject,
+      description: core.string.DeleteObjectDescription
+    },
+    core.permission.DeleteObject
+  )
 
-    Promise.all([audioGranted, videoGranted]).then(
-      (res) => { result(res.every(r => r)) },
-      () => { result(false) }
-    )
-  })
+  builder.createDoc(
+    core.class.Permission,
+    core.space.Model,
+    {
+      label: core.string.ForbidDeleteObject,
+      description: core.string.ForbidDeleteObjectDescription
+    },
+    core.permission.ForbidDeleteObject
+  )
 
-  session.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
-    if (process.platform !== 'darwin') {
-      return true
-    }
+  builder.createDoc(
+    core.class.Permission,
+    core.space.Model,
+    {
+      label: core.string.UpdateObject,
+      description: core.string.UpdateObjectDescription
+    },
+    core.permission.UpdateObject
+  )
 
-    if (permission !== 'media') {
-      return true
-    }
+  builder.createDoc(
+    core.class.Permission,
+    core.space.Model,
+    {
+      label: core.string.DeleteObject,
+      description: core.string.DeleteObjectDescription
+    },
+    core.permission.DeleteObject
+  )
 
-    if (details.mediaType === 'audio') {
-      return systemPreferences.getMediaAccessStatus('microphone') === 'granted'
-    }
+  builder.createDoc(
+    core.class.Permission,
+    core.space.Model,
+    {
+      label: core.string.UpdateSpace,
+      description: core.string.UpdateSpaceDescription
+    },
+    core.permission.UpdateSpace
+  )
 
-    if (details.mediaType === 'video') {
-      return systemPreferences.getMediaAccessStatus('camera') === 'granted'
-    }
-
-    return false
-  })
-}
-
-async function askForMediaAccess (type: 'microphone' | 'camera'): Promise<boolean> {
-  try {
-    if (process.platform !== 'darwin') {
-      return true
-    }
-
-    const status = systemPreferences.getMediaAccessStatus(type)
-    log.info(`Current ${type} access status:`, status)
-
-    if (status === 'not-determined') {
-      const success = await systemPreferences.askForMediaAccess(type)
-      log.info(`Result of ${type} access:`, success ? 'granted' : 'denied')
-      return success
-    }
-
-    return status === 'granted'
-  } catch (error) {
-    log.error(`Could not get ${type} permission:`, error.message)
-  }
-
-  return false
+  builder.createDoc(
+    core.class.Permission,
+    core.space.Model,
+    {
+      label: core.string.ArchiveSpace,
+      description: core.string.ArchiveSpaceDescription
+    },
+    core.permission.ArchiveSpace
+  )
 }

@@ -13,158 +13,489 @@
 // limitations under the License.
 //
 
+import request from '@hcengineering/request'
 import {
-  Collection as PropCollection,
+  type ChangeControl,
+  type ControlledDocument,
+  type ControlledDocumentState,
+  type Document,
+  type HierarchyDocument,
+  type DocumentApprovalRequest,
+  type DocumentCategory,
+  type DocumentRequest,
+  type DocumentReviewRequest,
+  type DocumentComment,
+  type DocumentSpace,
+  type DocumentSpaceType,
+  type DocumentSpaceTypeDescriptor,
+  type DocumentState,
+  type DocumentTemplate,
+  type Sequence,
+  type DocumentMeta,
+  type ExternalSpace,
+  type OrgSpace,
+  type Project,
+  type ProjectDocument,
+  type ProjectMeta,
+  type DocumentTraining,
+  type DocumentSnapshot,
+  type ControlledDocumentSnapshot
+} from '@hcengineering/controlled-documents'
+import { TRequest } from '@hcengineering/model-request'
+import { type Attachment } from '@hcengineering/attachment'
+import contact, { type Employee } from '@hcengineering/contact'
+import {
+  DateRangeMode,
+  IndexKind,
+  type Class,
+  type MarkupBlobRef,
+  type Doc,
+  type Domain,
+  type Ref,
+  type Timestamp,
+  type Type,
+  type CollectionSize,
+  type Role,
+  type TypedSpace,
+  type Account,
+  type RolesAssignment
+} from '@hcengineering/core'
+import {
+  ArrOf,
+  Collection,
+  Hidden,
   Index,
   Mixin,
   Model,
   Prop,
-  TypeMarkup,
+  TypeBoolean,
+  TypeDate,
+  TypeNumber,
   TypeRef,
   TypeString,
-  UX
+  UX,
+  TypeCollaborativeDoc,
+  TypeMarkup,
+  ReadOnly
 } from '@hcengineering/model'
-import core, { TAttachedDoc, TClass, TDoc, TSpace } from '@hcengineering/model-core'
-import type {
-  Channel,
-  ChatMessage,
-  ChatMessageViewlet,
-  ChatSyncInfo,
-  ChunterExtension,
-  ChunterSpace,
-  DirectMessage,
-  InlineButton,
-  InlineButtonAction,
-  ObjectChatPanel,
-  ThreadMessage,
-  TypingInfo,
-  ChunterExtensionPoint
-} from '@hcengineering/chunter'
-import {
-  type Class,
-  type Doc,
-  type Domain,
-  DOMAIN_MODEL,
-  DOMAIN_TRANSIENT,
-  IndexKind,
-  type Ref,
-  type Timestamp
-} from '@hcengineering/core'
-import contact, { type ChannelProvider as SocialChannelProvider, type Person } from '@hcengineering/contact'
-import activity, { type ActivityMessage } from '@hcengineering/activity'
-import { TActivityMessage } from '@hcengineering/model-activity'
 import attachment from '@hcengineering/model-attachment'
-import type { IntlString, Resource } from '@hcengineering/platform'
-import type { DocNotifyContext } from '@hcengineering/notification'
+import chunter, { TChatMessage } from '@hcengineering/model-chunter'
+import core, {
+  TAttachedDoc,
+  TDoc,
+  TTypedSpace,
+  TType,
+  TSpaceTypeDescriptor,
+  TSpaceType
+} from '@hcengineering/model-core'
+import { getEmbeddedLabel } from '@hcengineering/platform'
+import tags, { type TagReference } from '@hcengineering/tags'
+import time, { type ToDo } from '@hcengineering/time'
+import training, { type Training, type TrainingRequest } from '@hcengineering/training'
 
-import chunter from './plugin'
-import type { AnyComponent } from '@hcengineering/ui'
+import documents from './plugin'
 
-export const DOMAIN_CHUNTER = 'chunter' as Domain
+export const DOMAIN_DOCUMENTS = 'documents' as Domain
 
-@Model(chunter.class.ChunterSpace, core.class.Space)
-export class TChunterSpace extends TSpace implements ChunterSpace {
-  @Prop(PropCollection(activity.class.ActivityMessage), chunter.string.Messages)
-    messages?: number
+@Model(documents.class.DocumentSpace, core.class.TypedSpace)
+@UX(core.string.Space)
+export class TDocumentSpace extends TTypedSpace implements DocumentSpace {
+  @Prop(TypeRef(documents.class.DocumentSpaceType), documents.string.DocumentSpaceType)
+  declare type: Ref<DocumentSpaceType>
 }
 
-@Model(chunter.class.Channel, chunter.class.ChunterSpace)
-@UX(chunter.string.Channel, chunter.icon.Hashtag, undefined, undefined, undefined, chunter.string.Channels)
-export class TChannel extends TChunterSpace implements Channel {
-  @Prop(TypeString(), chunter.string.Topic)
+@Model(documents.class.DocumentSpaceType, core.class.SpaceType)
+export class TDocumentSpaceType extends TSpaceType implements DocumentSpaceType {
+  @Prop(TypeRef(documents.class.DocumentSpaceTypeDescriptor), getEmbeddedLabel('Descriptor'))
+  declare descriptor: Ref<DocumentSpaceTypeDescriptor>
+
+  @Prop(TypeRef(core.class.Class), getEmbeddedLabel('Target Class'))
+  declare targetClass: Ref<Class<DocumentSpace>>
+
+  @Prop(TypeBoolean(), getEmbeddedLabel('Projects'))
+    projects!: boolean
+}
+
+@Model(documents.class.DocumentSpaceTypeDescriptor, core.class.SpaceTypeDescriptor)
+export class TDocumentSpaceTypeDescriptor extends TSpaceTypeDescriptor implements DocumentSpaceTypeDescriptor {
+  projectClass?: Ref<Class<Project>>
+  withProjects?: boolean
+}
+
+@Model(documents.class.OrgSpace, documents.class.DocumentSpace)
+export class TOrgSpace extends TDocumentSpace implements OrgSpace {}
+
+@Model(documents.class.ExternalSpace, documents.class.DocumentSpace)
+export class TExternalSpace extends TDocumentSpace implements ExternalSpace {}
+
+@Model(documents.class.Project, core.class.Doc, DOMAIN_DOCUMENTS)
+export class TProject extends TDoc implements Project {
+  @Prop(TypeRef(documents.class.DocumentSpace), documents.string.Space)
+  @Index(IndexKind.Indexed)
+  declare space: Ref<DocumentSpace>
+
+  @Prop(TypeString(), documents.string.Name)
   @Index(IndexKind.FullText)
-    topic?: string
+  @ReadOnly()
+    name!: string
+
+  @Prop(TypeBoolean(), documents.string.Readonly)
+  @ReadOnly()
+  @Hidden()
+    readonly!: boolean
 }
 
-@Model(chunter.class.DirectMessage, chunter.class.ChunterSpace)
-@UX(chunter.string.DirectMessage, contact.icon.Person, undefined, undefined, undefined, chunter.string.DirectMessages)
-export class TDirectMessage extends TChunterSpace implements DirectMessage {}
+@Model(documents.class.DocumentMeta, core.class.Doc, DOMAIN_DOCUMENTS)
+@UX(documents.string.Document)
+export class TDocumentMeta extends TDoc implements DocumentMeta {
+  @Prop(Collection(documents.class.Document), documents.string.Documents)
+    documents!: CollectionSize<Document>
 
-@Model(chunter.class.ChatMessage, activity.class.ActivityMessage)
-@UX(chunter.string.Message, chunter.icon.Thread, undefined, undefined, undefined, chunter.string.Threads)
-export class TChatMessage extends TActivityMessage implements ChatMessage {
-  @Prop(TypeMarkup(), chunter.string.Message)
+  @Prop(TypeString(), documents.string.Title)
   @Index(IndexKind.FullText)
-    message!: string
-
-  @Prop(PropCollection(attachment.class.Attachment), attachment.string.Attachments, {
-    shortLabel: attachment.string.Files
-  })
-    attachments?: number
-
-  @Prop(TypeRef(contact.class.ChannelProvider), core.string.Object)
-    provider?: Ref<SocialChannelProvider>
-
-  @Prop(PropCollection(chunter.class.InlineButton), core.string.Object)
-    inlineButtons?: number
+    title!: string
 }
 
-@Model(chunter.class.ThreadMessage, chunter.class.ChatMessage)
-@UX(chunter.string.ThreadMessage, chunter.icon.Thread, undefined, undefined, undefined, chunter.string.Threads)
-export class TThreadMessage extends TChatMessage implements ThreadMessage {
-  @Prop(TypeRef(activity.class.ActivityMessage), core.string.AttachedTo)
+@Model(documents.class.ProjectMeta, core.class.Doc, DOMAIN_DOCUMENTS)
+@UX(documents.string.Project)
+export class TProjectMeta extends TDoc implements ProjectMeta {
+  @Prop(TypeRef(documents.class.Project), documents.string.Project)
   @Index(IndexKind.Indexed)
-  declare attachedTo: Ref<ActivityMessage>
+    project!: Ref<Project>
 
-  @Prop(TypeRef(activity.class.ActivityMessage), core.string.AttachedToClass)
+  @Prop(TypeRef(documents.class.DocumentMeta), documents.string.Document)
   @Index(IndexKind.Indexed)
-  declare attachedToClass: Ref<Class<ActivityMessage>>
+  @Hidden()
+    meta!: Ref<DocumentMeta>
 
-  @Prop(TypeRef(core.class.Doc), core.string.Object)
+  @Prop(ArrOf(TypeRef(documents.class.DocumentMeta)), documents.string.Path)
+    path!: Ref<DocumentMeta>[]
+
+  @Prop(TypeRef(documents.class.DocumentMeta), documents.string.Parent)
   @Index(IndexKind.Indexed)
-    objectId!: Ref<Doc>
+    parent!: Ref<DocumentMeta>
 
-  @Prop(TypeRef(core.class.Class), core.string.Class)
+  // @Prop(TypeRef(documents.class.Document), documents.string.Document)
+  // @Index(IndexKind.Indexed)
+  //   head!: Ref<HierarchyDocument>
+
+  @Prop(Collection(documents.class.ProjectDocument), documents.string.Documents)
+    documents!: CollectionSize<ProjectDocument>
+}
+
+@Model(documents.class.ProjectDocument, core.class.AttachedDoc, DOMAIN_DOCUMENTS)
+@UX(documents.string.Document)
+export class TProjectDocument extends TAttachedDoc implements ProjectDocument {
+  @Prop(TypeRef(core.class.Space), core.string.Space)
   @Index(IndexKind.Indexed)
-    objectClass!: Ref<Class<Doc>>
-}
+  @Hidden()
+  declare space: Ref<DocumentSpace>
 
-@Model(chunter.class.ChatMessageViewlet, core.class.Doc, DOMAIN_MODEL)
-export class TChatMessageViewlet extends TDoc implements ChatMessageViewlet {
-  @Prop(TypeRef(core.class.Doc), core.string.Class)
+  @Prop(TypeRef(documents.class.ProjectMeta), documents.string.Project)
   @Index(IndexKind.Indexed)
-    objectClass!: Ref<Class<Doc>>
+  @Hidden()
+  declare attachedTo: Ref<ProjectMeta>
 
-  @Prop(TypeRef(core.class.Doc), core.string.Class)
+  @Prop(TypeString(), core.string.Collection)
+  @Hidden()
+  override collection: 'documents' = 'documents'
+
+  @Prop(TypeRef(documents.class.Project), documents.string.Project)
   @Index(IndexKind.Indexed)
-    messageClass!: Ref<Class<Doc>>
+    project!: Ref<Project>
 
-  label?: IntlString
-  onlyWithParent?: boolean
+  @Prop(TypeRef(documents.class.Project), documents.string.Project)
+  @Hidden()
+    initial!: Ref<Project>
+
+  @Prop(TypeRef(documents.class.Document), documents.string.Document)
+  @Index(IndexKind.Indexed)
+    document!: Ref<HierarchyDocument>
 }
 
-@Mixin(chunter.mixin.ObjectChatPanel, core.class.Class)
-export class TObjectChatPanel extends TClass implements ObjectChatPanel {
-  openByDefault?: boolean
-  ignoreKeys!: string[]
+@Model(documents.class.Document, core.class.Doc, DOMAIN_DOCUMENTS)
+@UX(documents.string.Document, documents.icon.Document)
+export class TDocument extends TDoc implements Document {
+  @Prop(TypeRef(core.class.Space), core.string.Space)
+  @Index(IndexKind.Indexed)
+  @Hidden()
+  declare space: Ref<DocumentSpace>
+
+  @Prop(TypeRef(documents.mixin.DocumentTemplate), documents.string.DocumentTemplate)
+  @Hidden()
+    template?: Ref<DocumentTemplate>
+
+  @Prop(TypeString(), documents.string.Title)
+  @Index(IndexKind.FullText)
+    title!: string
+
+  @Prop(TypeString(), documents.string.Title)
+  @Index(IndexKind.FullText)
+    code!: string
+
+  @Prop(TypeString(), documents.string.Code)
+  @Index(IndexKind.FullText)
+    prefix!: string
+
+  @Prop(TypeNumber(), documents.string.Number)
+  @Hidden()
+    seqNumber!: number
+
+  @Prop(TypeNumber(), documents.string.Major)
+    major!: number
+
+  @Prop(TypeNumber(), documents.string.Minor)
+    minor!: number
+
+  @Prop(TypeRef(documents.class.DocumentCategory), documents.string.Category)
+    category?: Ref<DocumentCategory>
+
+  @Prop(TypeRef(contact.mixin.Employee), documents.string.Author)
+    author?: Ref<Employee>
+
+  @Prop(TypeRef(contact.mixin.Employee), documents.string.Owner)
+    owner?: Ref<Employee>
+
+  @Prop(TypeDocumentState(), documents.string.Status)
+    state!: DocumentState
+
+  @Prop(TypeCollaborativeDoc(), documents.string.CollaborativeDocument)
+    content!: MarkupBlobRef | null
+
+  @Prop(Collection(tags.class.TagReference), documents.string.Labels)
+    labels?: CollectionSize<TagReference>
+
+  @Prop(TypeString(), documents.string.MetaAbstract)
+  @Index(IndexKind.FullText)
+    abstract?: string
+
+  @Prop(TypeNumber(), documents.string.Number)
+  @Hidden()
+    commentSequence!: number
+
+  @Prop(Collection(documents.class.DocumentComment), chunter.string.Comments)
+    comments?: CollectionSize<DocumentComment>
+
+  @Prop(Collection(documents.class.DocumentSnapshot), documents.string.Snapshots)
+    snapshots?: CollectionSize<DocumentSnapshot>
+
+  @Prop(Collection(attachment.class.Attachment), attachment.string.Attachments, { shortLabel: attachment.string.Files })
+    attachments?: CollectionSize<Attachment>
 }
 
-@Model(chunter.class.ChatSyncInfo, core.class.Doc, DOMAIN_CHUNTER)
-export class TChatSyncInfo extends TDoc implements ChatSyncInfo {
-  user!: Ref<Person>
-  hidden!: Ref<DocNotifyContext>[]
-  timestamp!: Timestamp
+@Model(documents.class.HierarchyDocument, documents.class.Document)
+@UX(documents.string.Document, documents.icon.Document)
+export class THierarchyDocument extends TDocument implements HierarchyDocument {
+  @Prop(TypeRef(documents.class.DocumentMeta), core.string.AttachedTo)
+  @Index(IndexKind.Indexed)
+  @Hidden()
+    attachedTo!: Ref<DocumentMeta>
+
+  @Prop(TypeRef(core.class.Class), core.string.AttachedToClass)
+  @Index(IndexKind.Indexed)
+  @Hidden()
+    attachedToClass!: Ref<Class<DocumentMeta>>
+
+  @Prop(TypeString(), core.string.Collection)
+  @Hidden()
+    collection!: 'documents'
 }
 
-@Model(chunter.class.InlineButton, core.class.Doc, DOMAIN_CHUNTER)
-export class TInlineButton extends TAttachedDoc implements InlineButton {
-  name!: string
-  titleIntl?: IntlString
-  title?: string
-  action!: Resource<InlineButtonAction>
+@Mixin(documents.mixin.DocumentTemplate, documents.class.Document)
+@UX(documents.string.DocumentTemplate, documents.icon.Document)
+export class TDocumentTemplate extends TDocument implements DocumentTemplate {
+  @Prop(TypeNumber(), core.string.Collection)
+  @Hidden()
+    sequence!: number
+
+  @Prop(TypeString(), documents.string.DocumentPrefix)
+  @Index(IndexKind.FullText)
+    docPrefix!: string
 }
 
-@Model(chunter.class.TypingInfo, core.class.Doc, DOMAIN_TRANSIENT)
-export class TTypingInfo extends TDoc implements TypingInfo {
-  objectId!: Ref<Doc>
-  objectClass!: Ref<Class<Doc>>
-  person!: Ref<Person>
-  lastTyping!: Timestamp
+@Mixin(documents.mixin.DocumentTraining, documents.class.Document)
+@UX(training.string.Training, training.icon.Training)
+export class TDocumentTraining extends TDocument implements DocumentTraining {
+  @Prop(TypeBoolean(), documents.string.DocumentTrainingEnabled, { defaultValue: false })
+    enabled: boolean = false
+
+  @Prop(TypeRef(training.class.Training), training.string.Training, { defaultValue: null })
+    training: Ref<Training> | null = null
+
+  @Prop(ArrOf(TypeRef(core.class.Role)), training.string.TrainingRequestRoles, { defaultValue: [] })
+    roles: Array<Ref<Role>> = []
+
+  @Prop(ArrOf(TypeRef(contact.mixin.Employee)), training.string.TrainingRequestTrainees, { defaultValue: [] })
+    trainees: TrainingRequest['trainees'] = []
+
+  @Prop(TypeNumber(), training.string.TrainingRequestMaxAttempts, { defaultValue: null })
+    maxAttempts: TrainingRequest['maxAttempts'] = null
+
+  @Prop(TypeNumber(), documents.string.DocumentTrainingDueDays, { defaultValue: null })
+    dueDays: number | null = null
 }
 
-@Model(chunter.class.ChunterExtension, core.class.Doc, DOMAIN_MODEL)
-export class TChunterExtension extends TDoc implements ChunterExtension {
-  ofClass!: Ref<Class<Doc>>
-  point!: ChunterExtensionPoint
-  component!: AnyComponent
+@Model(documents.class.DocumentCategory, core.class.Doc, DOMAIN_DOCUMENTS)
+@UX(documents.string.Category)
+export class TDocumentCategory extends TDoc implements DocumentCategory {
+  @Prop(TypeRef(core.class.TypedSpace), core.string.Space)
+  @Index(IndexKind.Indexed)
+  @Hidden()
+  declare space: Ref<TypedSpace>
+
+  @Prop(TypeString(), documents.string.Code)
+  @Index(IndexKind.FullText)
+    code!: string
+
+  @Prop(TypeString(), documents.string.Title)
+  @Index(IndexKind.FullText)
+    title!: string
+
+  @Prop(TypeMarkup(), documents.string.Description)
+  @Index(IndexKind.FullText)
+    description?: string
+
+  @Prop(Collection(attachment.class.Attachment), attachment.string.Attachments, { shortLabel: attachment.string.Files })
+    attachments?: CollectionSize<Attachment>
 }
+
+@Model(documents.class.ControlledDocument, documents.class.HierarchyDocument)
+@UX(
+  documents.string.ControlledDocument,
+  documents.icon.Document,
+  undefined,
+  undefined,
+  undefined,
+  documents.string.Documents
+)
+export class TControlledDocument extends THierarchyDocument implements ControlledDocument {
+  @Prop(Collection(documents.class.DocumentRequest), documents.string.Requests)
+  @Hidden()
+    requests!: CollectionSize<DocumentRequest>
+
+  @Prop(ArrOf(TypeRef(contact.mixin.Employee)), documents.string.Reviewers)
+    reviewers!: Ref<Employee>[]
+
+  @Prop(ArrOf(TypeRef(contact.mixin.Employee)), documents.string.Approvers)
+    approvers!: Ref<Employee>[]
+
+  @Prop(ArrOf(TypeRef(contact.mixin.Employee)), documents.string.CoAuthors)
+    coAuthors!: Ref<Employee>[]
+
+  @Prop(TypeNumber(), documents.string.ReviewInterval)
+    reviewInterval?: number
+
+  @Prop(TypeControlledDocumentState(), documents.string.ControlledStatus)
+    controlledState?: ControlledDocumentState
+
+  @Prop(TypeDate(DateRangeMode.DATE), documents.string.EffectiveDate)
+    effectiveDate?: Timestamp
+
+  @Prop(TypeDate(DateRangeMode.DATE), documents.string.PlannedEffectiveDate)
+  @Hidden()
+    plannedEffectiveDate!: Timestamp
+
+  @Prop(TypeRef(documents.class.Document), documents.string.ChangeControl)
+  @Hidden()
+    changeControl!: Ref<ChangeControl>
+
+  @Prop(Collection(time.class.ToDo), getEmbeddedLabel('Action Items'))
+    todos?: CollectionSize<ToDo>
+}
+
+@Model(documents.class.ChangeControl, core.class.Doc, DOMAIN_DOCUMENTS)
+@UX(documents.string.ChangeControl)
+export class TChangeControl extends TDoc implements ChangeControl {
+  @Prop(TypeString(), documents.string.Description)
+  @Index(IndexKind.FullText)
+    description!: string
+
+  @Prop(TypeString(), documents.string.Reason)
+  @Index(IndexKind.FullText)
+    reason!: string
+
+  @Prop(TypeString(), documents.string.ImpactAnalysis)
+    impact!: string
+
+  @Prop(ArrOf(TypeRef(documents.class.Document)), documents.string.ImpactedDocuments)
+    impactedDocuments!: Ref<Document>[]
+}
+
+@Model(documents.class.DocumentSnapshot, core.class.AttachedDoc, DOMAIN_DOCUMENTS)
+@UX(documents.string.Snapshot)
+export class TDocumentSnapshot extends TAttachedDoc implements DocumentSnapshot {
+  @Prop(TypeString(), documents.string.Name)
+    name?: string
+
+  @Prop(TypeCollaborativeDoc(), documents.string.CollaborativeDocument)
+  @Hidden()
+    content!: MarkupBlobRef | null
+
+  @Prop(TypeDocumentState(), documents.string.Status)
+    state?: DocumentState
+}
+
+@Model(documents.class.ControlledDocumentSnapshot, documents.class.DocumentSnapshot)
+@UX(documents.string.ControlledSnapshot)
+export class TControlledDocumentSnapshot extends TDocumentSnapshot implements ControlledDocumentSnapshot {
+  @Prop(TypeControlledDocumentState(), documents.string.Status)
+    controlledState!: ControlledDocumentState
+}
+
+@Model(documents.class.DocumentComment, chunter.class.ChatMessage)
+export class TDocumentComment extends TChatMessage implements DocumentComment {
+  @Prop(TypeString(), documents.string.ID)
+    nodeId?: string
+
+  @Prop(TypeBoolean(), documents.string.Resolve)
+    resolved?: boolean
+
+  @Prop(TypeNumber(), documents.string.Index)
+    index?: number
+}
+
+@Model(documents.class.Sequence, core.class.Doc, DOMAIN_DOCUMENTS)
+export class TSequence extends TDoc implements Sequence {
+  attachedTo!: Ref<Class<Doc>>
+  sequence!: number
+}
+
+@Model(documents.class.DocumentRequest, request.class.Request)
+@UX(documents.string.DocumentRequest)
+export class TDocumentRequest extends TRequest implements DocumentRequest {}
+
+@Model(documents.class.DocumentReviewRequest, documents.class.DocumentRequest)
+@UX(documents.string.DocumentReviewRequest)
+export class TDocumentReviewRequest extends TDocumentRequest implements DocumentReviewRequest {}
+
+@Model(documents.class.DocumentApprovalRequest, documents.class.DocumentRequest)
+@UX(documents.string.DocumentApprovalRequest)
+export class TDocumentApprovalRequest extends TDocumentRequest implements DocumentApprovalRequest {}
+
+@Mixin(documents.mixin.DocumentSpaceTypeData, documents.class.DocumentSpace)
+@UX(getEmbeddedLabel('Default Documents'), documents.icon.Document)
+export class TDocumentSpaceTypeData extends TDocumentSpace implements RolesAssignment {
+  [key: Ref<Role>]: Ref<Account>[]
+}
+
+/**
+ * @public
+ */
+export function TypeDocumentState (): Type<DocumentState> {
+  return { _class: documents.class.TypeDocumentState, label: documents.string.Status }
+}
+
+@UX(documents.string.Status)
+@Model(documents.class.TypeDocumentState, core.class.Type)
+export class TTypeDocumentState extends TType {}
+
+/**
+ * @public
+ */
+export function TypeControlledDocumentState (): Type<ControlledDocumentState> {
+  return { _class: documents.class.TypeControlledDocumentState, label: documents.string.ControlledStatus }
+}
+
+@UX(documents.string.ControlledStatus)
+@Model(documents.class.TypeControlledDocumentState, core.class.Type)
+export class TTypeControlledDocumentState extends TType {}
