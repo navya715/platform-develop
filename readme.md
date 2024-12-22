@@ -1,20 +1,30 @@
-# Overview
+# Docker Compose dev image
 
-A docker configuration to use local installation of mongo db.
-
-## Migrate from docker volume based mongo
+## Running platform inside docker compose
 
 ```bash
-./dump-docker.sh # To dump all databases
-./start.sh # to start a local mongodb on ~/.mongo/data folder
-./import.sh # To import all stuff into local mongo database.
+rush build
+rush bundle
+rush docker:build
+docker compose up -d --force-recreate
 ```
 
-## Usage
+## Running ElasticVUE to check elastic intance
 
 ```bash
-./start.sh # Will start a local mongo database
-./stop.sh # Will stop a local mongo dabase
-
-rush docker:local # Will up all necessary containers and point them into local mongo database
+docker run -p 8082:8080 -d cars10/elasticvue
 ```
+
+## Running Local NPM registry with Docker
+
+```bash
+docker run -it --rm --name verdaccio -p 4873:4873 verdaccio/verdaccio
+```
+
+```bash
+npm set registry http://localhost:4873
+npm adduser
+npm login
+```
+
+Verdaccio will be available via HTTP http://localhost:4873
