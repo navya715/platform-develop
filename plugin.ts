@@ -1,6 +1,5 @@
 //
-// Copyright © 2020, 2021 Anticrm Platform Contributors.
-// Copyright © 2021, 2022 Hardcore Engineering Inc.
+// Copyright © 2020 Anticrm Platform Contributors.
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -14,46 +13,152 @@
 // limitations under the License.
 //
 
+import type { Status, Client, Doc, Ref } from '@hcengineering/core'
+import { type NotificationGroup, type NotificationType } from '@hcengineering/notification'
+import type { IntlString, Resource, Status as OperationStatus } from '@hcengineering/platform'
+import { mergeIds } from '@hcengineering/platform'
+import { recruitId } from '@hcengineering/recruit'
+import recruit from '@hcengineering/recruit-resources/src/plugin'
+import { type TaskTypeDescriptor, type ProjectType } from '@hcengineering/task'
+import type { AnyComponent, Location } from '@hcengineering/ui/src/types'
+import type {
+  Action,
+  ActionCategory,
+  ViewAction,
+  ViewActionAvailabilityFunction,
+  ViewQueryAction,
+  Viewlet
+} from '@hcengineering/view'
+import { type DocUpdateMessageViewlet } from '@hcengineering/activity'
 import { type ChatMessageViewlet } from '@hcengineering/chunter'
-import type { Client, Doc, Ref } from '@hcengineering/core'
-import { inventoryId } from '@hcengineering/inventory'
-import inventory from '@hcengineering/inventory-resources/src/plugin'
-import { type IntlString, mergeIds, type Resource } from '@hcengineering/platform'
-import type { AnyComponent } from '@hcengineering/ui/src/types'
-import { type Action, type ActionCategory, type ViewAction, type Viewlet } from '@hcengineering/view'
-export default mergeIds(inventoryId, inventory, {
+
+export default mergeIds(recruitId, recruit, {
   action: {
-    CreateSubcategory: '' as Ref<Action>
+    CreateOpinion: '' as Ref<Action>,
+    CreateGlobalApplication: '' as Ref<Action<Doc, any>>,
+    CopyApplicationId: '' as Ref<Action<Doc, any>>,
+    CopyApplicationLink: '' as Ref<Action<Doc, any>>,
+    CopyCandidateLink: '' as Ref<Action<Doc, any>>,
+    MoveApplicant: '' as Ref<Action>,
+    GetTalentIds: '' as Ref<Action<Doc, any>>,
+    WriteEmail: '' as Ref<Action<Doc, any>>,
+    EditStatuses: '' as Ref<Action>
   },
   actionImpl: {
-    CreateSubcategory: '' as ViewAction
+    CreateOpinion: '' as ViewAction,
+    MoveApplicant: '' as ViewAction
   },
   category: {
-    Inventory: '' as Ref<ActionCategory>
-  },
-  component: {
-    Categories: '' as AnyComponent,
-    CreateProduct: '' as AnyComponent,
-    EditProduct: '' as AnyComponent,
-    CategoryPresenter: '' as AnyComponent,
-    CategoryRefPresenter: '' as AnyComponent,
-    Variants: '' as AnyComponent,
-    ProductPresenter: '' as AnyComponent,
-    VariantPresenter: '' as AnyComponent
-  },
-  viewlet: {
-    TableProduct: '' as Ref<Viewlet>
-  },
-  string: {
-    ConfigLabel: '' as IntlString,
-    ConfigDescription: '' as IntlString
-  },
-  ids: {
-    ProductChatMessageViewlet: '' as Ref<ChatMessageViewlet>,
-    CategoryChatMessageViewlet: '' as Ref<ChatMessageViewlet>
+    Recruit: '' as Ref<ActionCategory>
   },
   function: {
-    ProductIdProvider: '' as Resource<(client: Client, ref: Ref<Doc>, doc?: Doc) => Promise<string>>,
-    CategoryIdProvider: '' as Resource<(client: Client, ref: Ref<Doc>, doc?: Doc) => Promise<string>>
+    GetObjectLinkFragment: '' as Resource<(doc: Doc, props: Record<string, any>) => Promise<Location>>,
+    GetIdObjectLinkFragment: '' as Resource<(doc: Doc, props: Record<string, any>) => Promise<Location>>,
+    GetObjectLink: '' as Resource<(doc: Doc, props: Record<string, any>) => Promise<string>>,
+    GetTalentId: '' as Resource<(doc: Doc, props: Record<string, any>) => Promise<string>>,
+    HideDoneState: '' as ViewQueryAction,
+    HideArchivedVacancies: '' as ViewQueryAction,
+    ApplicantHasEmail: '' as Resource<ViewActionAvailabilityFunction>,
+    ParseLinkId: '' as Resource<(id: string) => Promise<Ref<Doc> | undefined>>
+  },
+  string: {
+    ApplicationsShort: '' as IntlString,
+    TalentPools: '' as IntlString,
+    SearchApplication: '' as IntlString,
+    SearchVacancy: '' as IntlString,
+    AssignedRecruiter: '' as IntlString,
+    Due: '' as IntlString,
+    Source: '' as IntlString,
+    ManageVacancyStatuses: '' as IntlString,
+    EditVacancy: '' as IntlString,
+    GotoTalents: '' as IntlString,
+    GotoVacancies: '' as IntlString,
+    GotoSkills: '' as IntlString,
+    GotoMyApplications: '' as IntlString,
+    GotoApplicants: '' as IntlString,
+    GotoRecruitApplication: '' as IntlString,
+    VacancyList: '' as IntlString,
+    ConfigDescription: '' as IntlString,
+    ShowApplications: '' as IntlString,
+    HideDoneState: '' as IntlString,
+    HideArchivedVacancies: '' as IntlString,
+    HideApplicantsFromArchivedVacancies: '' as IntlString
+  },
+  validator: {
+    ApplicantValidator: '' as Resource<<T extends Doc>(doc: T, client: Client) => Promise<OperationStatus>>
+  },
+  ids: {
+    VacancyNotificationGroup: '' as Ref<NotificationGroup>,
+    CandidateNotificationGroup: '' as Ref<NotificationGroup>,
+    ReviewNotificationGroup: '' as Ref<NotificationGroup>,
+    ApplicationNotificationGroup: '' as Ref<NotificationGroup>,
+    AssigneeNotification: '' as Ref<NotificationType>,
+    ApplicationCreateNotification: '' as Ref<NotificationType>,
+    ReviewCreateNotification: '' as Ref<NotificationType>,
+    ApplicantUpdatedActivityViewlet: '' as Ref<DocUpdateMessageViewlet>,
+    ApplicantChatMessageViewlet: '' as Ref<ChatMessageViewlet>,
+    VacancyChatMessageViewlet: '' as Ref<ChatMessageViewlet>,
+    ReviewChatMessageViewlet: '' as Ref<ChatMessageViewlet>
+  },
+  component: {
+    CreateApplication: '' as AnyComponent,
+    KanbanCard: '' as AnyComponent,
+    ApplicationPresenter: '' as AnyComponent,
+    ApplicationsPresenter: '' as AnyComponent,
+    VacancyPresenter: '' as AnyComponent,
+    EditApplication: '' as AnyComponent,
+    TemplatesIcon: '' as AnyComponent,
+    Applications: '' as AnyComponent,
+    SkillsView: '' as AnyComponent,
+    Vacancies: '' as AnyComponent,
+    Organizations: '' as AnyComponent,
+
+    CreateReview: '' as AnyComponent,
+    Reviews: '' as AnyComponent,
+    KanbanReviewCard: '' as AnyComponent,
+    EditReview: '' as AnyComponent,
+    ReviewPresenter: '' as AnyComponent,
+    Opinions: '' as AnyComponent,
+    OpinionPresenter: '' as AnyComponent,
+    NewCandidateHeader: '' as AnyComponent,
+    ApplicantFilter: '' as AnyComponent,
+    VacancyList: '' as AnyComponent,
+    VacancyTemplateEditor: '' as AnyComponent,
+    ApplicationMatchPresenter: '' as AnyComponent,
+
+    NotificationApplicantPresenter: '' as AnyComponent,
+    VacancyEditor: '' as AnyComponent,
+    ApplicantNamePresenter: '' as AnyComponent
+  },
+  template: {
+    DefaultVacancy: '' as Ref<ProjectType>
+  },
+  viewlet: {
+    TableCandidate: '' as Ref<Viewlet>,
+    TableVacancy: '' as Ref<Viewlet>,
+    ListVacancy: '' as Ref<Viewlet>,
+    ApplicantTable: '' as Ref<Viewlet>,
+    ApplicantKanban: '' as Ref<Viewlet>,
+    ListApplicant: '' as Ref<Viewlet>,
+    ListTalent: '' as Ref<Viewlet>,
+    ListCompanies: '' as Ref<Viewlet>,
+    TableApplicant: '' as Ref<Viewlet>,
+    TableApplicantMatch: '' as Ref<Viewlet>,
+    CalendarReview: '' as Ref<Viewlet>,
+    TableReview: '' as Ref<Viewlet>,
+    TableVacancyList: '' as Ref<Viewlet>,
+    ApplicantDashboard: '' as Ref<Viewlet>
+  },
+  descriptors: {
+    Application: '' as Ref<TaskTypeDescriptor>
+  },
+  taskTypeStatus: {
+    Backlog: '' as Ref<Status>,
+    HRInterview: '' as Ref<Status>,
+    TechnicalInterview: '' as Ref<Status>,
+    TestTask: '' as Ref<Status>,
+    Offer: '' as Ref<Status>,
+    Won: '' as Ref<Status>,
+    Lost: '' as Ref<Status>
   }
 })
