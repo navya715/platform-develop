@@ -1,75 +1,37 @@
-import {
-  AccountRole,
-  DOMAIN_MODEL_TX,
-  type Account,
-  type Ref,
-  type Space,
-  type TxCreateDoc,
-  type TxUpdateDoc
-} from '@hcengineering/core'
-import { guestId } from '@hcengineering/guest'
+//
+// Copyright © 2022 Hardcore Engineering Inc.
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+import core, { type Ref, type Space } from '@hcengineering/core'
+import { inventoryId } from '@hcengineering/inventory'
 import {
   migrateSpace,
   tryMigrate,
   type MigrateOperation,
   type MigrationClient,
-  type MigrationUpgradeClient,
-  type ModelLogger
+  type MigrationUpgradeClient
 } from '@hcengineering/model'
-import core from '@hcengineering/model-core'
-import { GUEST_DOMAIN } from '.'
+import { DOMAIN_INVENTORY } from '.'
 
-export const guestOperation: MigrateOperation = {
-  async migrate (client: MigrationClient, logger: ModelLogger): Promise<void> {
-    await tryMigrate(client, guestId, [
-      {
-        state: 'migrateRoles',
-        func: async (client) => {
-          const stateMap = {
-            0: AccountRole.User,
-            1: AccountRole.Maintainer,
-            2: AccountRole.Owner
-          }
-          const createTxes = await client.find<TxCreateDoc<Account>>(DOMAIN_MODEL_TX, {
-            _class: core.class.TxCreateDoc,
-            'attributes.role': { $in: [0, 1, 2] }
-          })
-          for (const tx of createTxes) {
-            await client.update(
-              DOMAIN_MODEL_TX,
-              {
-                _id: tx._id
-              },
-              {
-                $set: {
-                  'attributes.role': (stateMap as any)[tx.attributes.role]
-                }
-              }
-            )
-          }
-          const updateTxes = await client.find<TxUpdateDoc<Account>>(DOMAIN_MODEL_TX, {
-            _class: core.class.TxUpdateDoc,
-            'operations.role': { $in: [0, 1, 2] }
-          })
-          for (const tx of updateTxes) {
-            await client.update(
-              DOMAIN_MODEL_TX,
-              {
-                _id: tx._id
-              },
-              {
-                $set: {
-                  'operations.role': (stateMap as any)[(tx.operations as any).role]
-                }
-              }
-            )
-          }
-        }
-      },
+export const inventoryOperation: MigrateOperation = {
+  async migrate (client: MigrationClient): Promise<void> {
+    await tryMigrate(client, inventoryId, [
       {
         state: 'removeDeprecatedSpace',
         func: async (client: MigrationClient) => {
-          await migrateSpace(client, 'guest:space:Links' as Ref<Space>, core.space.Workspace, [GUEST_DOMAIN])
+          await migrateSpace(client, 'inventory:space:Category' as Ref<Space>, core.space.Workspace, [DOMAIN_INVENTORY])
+          await migrateSpace(client, 'inventory:space:Products' as Ref<Space>, core.space.Workspace, [DOMAIN_INVENTORY])
         }
       }
     ])
