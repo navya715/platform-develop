@@ -1,246 +1,170 @@
-import z from 'zod'
+//
+// Copyright © 2024 Hardcore Engineering Inc.
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 
-import { readFile } from '../helpers'
+import {
+  Collection as PropCollection,
+  Index,
+  Mixin,
+  Model,
+  Prop,
+  TypeMarkup,
+  TypeRef,
+  TypeString,
+  UX
+} from '@hcengineering/model'
+import core, { TAttachedDoc, TClass, TDoc, TSpace } from '@hcengineering/model-core'
+import type {
+  Channel,
+  ChatMessage,
+  ChatMessageViewlet,
+  ChatSyncInfo,
+  ChunterExtension,
+  ChunterSpace,
+  DirectMessage,
+  InlineButton,
+  InlineButtonAction,
+  ObjectChatPanel,
+  ThreadMessage,
+  TypingInfo,
+  ChunterExtensionPoint
+} from '@hcengineering/chunter'
+import {
+  type Class,
+  type Doc,
+  type Domain,
+  DOMAIN_MODEL,
+  DOMAIN_TRANSIENT,
+  IndexKind,
+  type Ref,
+  type Timestamp
+} from '@hcengineering/core'
+import contact, { type ChannelProvider as SocialChannelProvider, type Person } from '@hcengineering/contact'
+import activity, { type ActivityMessage } from '@hcengineering/activity'
+import { TActivityMessage } from '@hcengineering/model-activity'
+import attachment from '@hcengineering/model-attachment'
+import type { IntlString, Resource } from '@hcengineering/platform'
+import type { DocNotifyContext } from '@hcengineering/notification'
 
-// #region Node
+import chunter from './plugin'
+import type { AnyComponent } from '@hcengineering/ui'
 
-export enum NodeType {
-  GENERIC = 'generic',
-  LIST = 'list',
-  TABLE = 'table',
-  TOC_PARA_SEQ = 'toc-paragraph-seq'
+export const DOMAIN_CHUNTER = 'chunter' as Domain
+
+@Model(chunter.class.ChunterSpace, core.class.Space)
+export class TChunterSpace extends TSpace implements ChunterSpace {
+  @Prop(PropCollection(activity.class.ActivityMessage), chunter.string.Messages)
+    messages?: number
 }
 
-const tags = z.object({
-  tags: z.array(z.string())
-})
+@Model(chunter.class.Channel, chunter.class.ChunterSpace)
+@UX(chunter.string.Channel, chunter.icon.Hashtag, undefined, undefined, undefined, chunter.string.Channels)
+export class TChannel extends TChunterSpace implements Channel {
+  @Prop(TypeString(), chunter.string.Topic)
+  @Index(IndexKind.FullText)
+    topic?: string
+}
 
-const tagsWithText = tags.merge(
-  z.object({
-    patterns: z.array(z.string()).min(1)
+@Model(chunter.class.DirectMessage, chunter.class.ChunterSpace)
+@UX(chunter.string.DirectMessage, contact.icon.Person, undefined, undefined, undefined, chunter.string.DirectMessages)
+export class TDirectMessage extends TChunterSpace implements DirectMessage {}
+
+@Model(chunter.class.ChatMessage, activity.class.ActivityMessage)
+@UX(chunter.string.Message, chunter.icon.Thread, undefined, undefined, undefined, chunter.string.Threads)
+export class TChatMessage extends TActivityMessage implements ChatMessage {
+  @Prop(TypeMarkup(), chunter.string.Message)
+  @Index(IndexKind.FullText)
+    message!: string
+
+  @Prop(PropCollection(attachment.class.Attachment), attachment.string.Attachments, {
+    shortLabel: attachment.string.Files
   })
-)
+    attachments?: number
 
-const tableHeaderCell = z.object({
-  col: z.number().min(0),
-  content: z.string().min(1)
-})
+  @Prop(TypeRef(contact.class.ChannelProvider), core.string.Object)
+    provider?: Ref<SocialChannelProvider>
 
-const tableParams = z.object({
-  header: tableHeaderCell
-})
-
-const listParams = z.object({
-  start: tagsWithText,
-  title: z.string().optional()
-})
-
-const genericParams = z.object({
-  start: tagsWithText,
-  end: z.union([tagsWithText, tags]).optional()
-})
-
-const tocParaSeqParams = z.object({
-  start: tagsWithText,
-  sectionHeaders: tags,
-  end: tags
-})
-
-const tableNode = z.object({
-  type: z.literal(NodeType.TABLE),
-  params: tableParams
-})
-
-const listNode = z.object({
-  type: z.literal(NodeType.LIST),
-  params: listParams
-})
-
-const genericNode = z.object({
-  type: z.literal(NodeType.GENERIC),
-  params: genericParams
-})
-
-const tocParagraphSequence = z.object({
-  type: z.literal(NodeType.TOC_PARA_SEQ),
-  params: tocParaSeqParams
-})
-
-const node = z.discriminatedUnion('type', [tableNode, listNode, genericNode, tocParagraphSequence])
-
-export type ListParams = z.infer<typeof listParams>
-export type TableParams = z.infer<typeof tableParams>
-export type GenericParams = z.infer<typeof genericParams>
-export type TocParaSeqParams = z.infer<typeof tocParaSeqParams>
-
-export type TocParaSeqNodeSpec = z.infer<typeof tocParagraphSequence>
-export type GenericNodeSpec = z.infer<typeof genericNode>
-export type TagsWithTextSpec = z.infer<typeof tagsWithText>
-export type TagsSpec = z.infer<typeof tags>
-
-// #endregion
-
-// #region SectionSpec
-
-export enum SectionType {
-  TOC = 'toc',
-  DOC_HISTORY = 'doc-history',
-  RELATED_DOCS = 'related-docs',
-  GENERIC = 'generic'
+  @Prop(PropCollection(chunter.class.InlineButton), core.string.Object)
+    inlineButtons?: number
 }
 
-const genericSection = z.object({
-  type: z.union([
-    z.literal(SectionType.DOC_HISTORY),
-    z.literal(SectionType.RELATED_DOCS),
-    z.literal(SectionType.GENERIC)
-  ]),
-  node
-})
+@Model(chunter.class.ThreadMessage, chunter.class.ChatMessage)
+@UX(chunter.string.ThreadMessage, chunter.icon.Thread, undefined, undefined, undefined, chunter.string.Threads)
+export class TThreadMessage extends TChatMessage implements ThreadMessage {
+  @Prop(TypeRef(activity.class.ActivityMessage), core.string.AttachedTo)
+  @Index(IndexKind.Indexed)
+  declare attachedTo: Ref<ActivityMessage>
 
-const tocSection = z.object({
-  type: z.literal(SectionType.TOC),
-  node: tocParagraphSequence
-})
+  @Prop(TypeRef(activity.class.ActivityMessage), core.string.AttachedToClass)
+  @Index(IndexKind.Indexed)
+  declare attachedToClass: Ref<Class<ActivityMessage>>
 
-const section = z.union([tocSection, genericSection])
+  @Prop(TypeRef(core.class.Doc), core.string.Object)
+  @Index(IndexKind.Indexed)
+    objectId!: Ref<Doc>
 
-export type SectionSpec = z.infer<typeof section>
-export type TocSectionSpec = z.infer<typeof tocSection>
-
-// #endregion
-
-// #region Metadata
-
-export enum MetadataContainer {
-  MetaTags = 'meta-tags',
-  TableRow = 'table-row',
-  PageHeaderTableRow = 'page-header-table-row'
+  @Prop(TypeRef(core.class.Class), core.string.Class)
+  @Index(IndexKind.Indexed)
+    objectClass!: Ref<Class<Doc>>
 }
 
-const metaTagsMetadata = z.object({
-  in: z.literal(MetadataContainer.MetaTags),
-  docNameMetaTag: z.string().min(1),
-  docIdMetaTag: z.string().min(1)
-})
+@Model(chunter.class.ChatMessageViewlet, core.class.Doc, DOMAIN_MODEL)
+export class TChatMessageViewlet extends TDoc implements ChatMessageViewlet {
+  @Prop(TypeRef(core.class.Doc), core.string.Class)
+  @Index(IndexKind.Indexed)
+    objectClass!: Ref<Class<Doc>>
 
-const metadataTableCell = z.object({
-  extract: z.object({
-    row: z.number().min(0),
-    col: z.number().min(0),
-    slice: z
-      .object({
-        start: z.number().optional(),
-        end: z.number().optional()
-      })
-      .optional()
-  })
-})
-export type MetadataTableCell = z.infer<typeof metadataTableCell>
+  @Prop(TypeRef(core.class.Doc), core.string.Class)
+  @Index(IndexKind.Indexed)
+    messageClass!: Ref<Class<Doc>>
 
-const tableRowMetadata = z.object({
-  in: z.literal(MetadataContainer.TableRow),
-  tableHeader: tableHeaderCell,
-  docName: metadataTableCell,
-  docId: metadataTableCell
-})
-
-const pageHeaderTableRowMetadata = z.object({
-  in: z.literal(MetadataContainer.PageHeaderTableRow),
-  headerIdx: z.number().min(1).optional(),
-  docName: metadataTableCell,
-  docId: metadataTableCell
-})
-
-const docMetadata = z.union([metaTagsMetadata, tableRowMetadata, pageHeaderTableRowMetadata])
-
-export type DocMetadataSpec = z.infer<typeof docMetadata>
-export type DocMetaTagsMetadata = z.infer<typeof metaTagsMetadata>
-export type DocTableRowMetadata = z.infer<typeof tableRowMetadata>
-export type PageHeaderTableRowMetadata = z.infer<typeof pageHeaderTableRowMetadata>
-
-// #endregion
-
-// #region FileSpec
-
-export enum FileSpecType {
-  // sections in TOC are mapped to the sections in the document
-  TOC = 'toc'
+  label?: IntlString
+  onlyWithParent?: boolean
 }
 
-const tocFile = z.object({
-  prefix: z.string().min(1),
-  metadata: docMetadata,
-  type: z.literal(FileSpecType.TOC),
-  spec: z.object({
-    toc: tocSection,
-    sections: z.array(genericSection).optional()
-  })
-})
-
-export type FileSpec = z.infer<typeof tocFile>
-export type TocFileSpec = z.infer<typeof tocFile>
-
-// #endregion
-
-export async function read (specFile?: string): Promise<FileSpec> {
-  if (specFile == null) {
-    return DEFAULT_SPEC
-  }
-
-  const buffer = await readFile(specFile)
-  return tocFile.parse(JSON.parse(buffer))
+@Mixin(chunter.mixin.ObjectChatPanel, core.class.Class)
+export class TObjectChatPanel extends TClass implements ObjectChatPanel {
+  openByDefault?: boolean
+  ignoreKeys!: string[]
 }
 
-export const DEFAULT_SPEC: FileSpec = {
-  prefix: 'IMPORTED',
-  type: FileSpecType.TOC,
-  metadata: {
-    in: MetadataContainer.TableRow,
-    tableHeader: {
-      col: 0,
-      content: 'title:'
-    },
-    docName: {
-      extract: { row: 0, col: 1 }
-    },
-    docId: {
-      extract: { row: 1, col: 1 }
-    }
-  },
-  spec: {
-    toc: {
-      type: SectionType.TOC,
-      node: {
-        type: NodeType.TOC_PARA_SEQ,
-        params: {
-          sectionHeaders: {
-            tags: ['h1']
-          },
-          start: {
-            patterns: ['Table of contents', 'Table des matières'],
-            tags: ['h1', 'h2', 'h3', 'p']
-          },
-          end: {
-            tags: ['h1']
-          }
-        }
-      }
-    },
-    sections: [
-      {
-        type: SectionType.RELATED_DOCS,
-        node: {
-          type: NodeType.LIST,
-          params: {
-            start: {
-              tags: ['h2'],
-              patterns: ['related documents']
-            },
-            title: 'related-docs'
-          }
-        }
-      }
-    ]
-  }
+@Model(chunter.class.ChatSyncInfo, core.class.Doc, DOMAIN_CHUNTER)
+export class TChatSyncInfo extends TDoc implements ChatSyncInfo {
+  user!: Ref<Person>
+  hidden!: Ref<DocNotifyContext>[]
+  timestamp!: Timestamp
+}
+
+@Model(chunter.class.InlineButton, core.class.Doc, DOMAIN_CHUNTER)
+export class TInlineButton extends TAttachedDoc implements InlineButton {
+  name!: string
+  titleIntl?: IntlString
+  title?: string
+  action!: Resource<InlineButtonAction>
+}
+
+@Model(chunter.class.TypingInfo, core.class.Doc, DOMAIN_TRANSIENT)
+export class TTypingInfo extends TDoc implements TypingInfo {
+  objectId!: Ref<Doc>
+  objectClass!: Ref<Class<Doc>>
+  person!: Ref<Person>
+  lastTyping!: Timestamp
+}
+
+@Model(chunter.class.ChunterExtension, core.class.Doc, DOMAIN_MODEL)
+export class TChunterExtension extends TDoc implements ChunterExtension {
+  ofClass!: Ref<Class<Doc>>
+  point!: ChunterExtensionPoint
+  component!: AnyComponent
 }

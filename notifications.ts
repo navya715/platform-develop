@@ -1,205 +1,171 @@
-import contact, { PersonAccount, formatName } from '@hcengineering/contact'
-import { Ref, TxOperations } from '@hcengineering/core'
-import notification, { DocNotifyContext, CommonInboxNotification, ActivityInboxNotification, InboxNotification } from '@hcengineering/notification'
-import { IntlString, addEventListener, translate } from '@hcengineering/platform'
-import { getClient } from '@hcengineering/presentation'
-import { location } from '@hcengineering/ui'
-import workbench, { workbenchId } from '@hcengineering/workbench'
-import desktopPreferences, { defaultNotificationPreference } from '@hcengineering/desktop-preferences'
-import { activePreferences } from '@hcengineering/desktop-preferences-resources'
-import { InboxNotificationsClientImpl, getDisplayInboxData } from '@hcengineering/notification-resources'
+//
+// Copyright © 2024 Hardcore Engineering Inc.
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 
-import { IPCMainExposed } from './types'
+import { type Builder } from '@hcengineering/model'
+import notification from '@hcengineering/model-notification'
+import core from '@hcengineering/model-core'
+import activity from '@hcengineering/activity'
 
-let client: TxOperations
+import chunter from './plugin'
 
-async function hydrateNotificationAsYouCan (lastNotification: InboxNotification): Promise<{ title: string, body: string } | undefined> {
-  // Let's try to do our best and figure out from who we have an notification
-
-  if (client === undefined) {
-    return undefined
-  }
-
-  if (lastNotification === undefined) {
-    return undefined
-  }
-
-  let intlTitle: IntlString | undefined
-  let titleParams
-
-  if (lastNotification._class === notification.class.CommonInboxNotification) {
-    intlTitle = (lastNotification as CommonInboxNotification).message
-    titleParams = (lastNotification as CommonInboxNotification).props
-  } else if (lastNotification._class === notification.class.ActivityInboxNotification) {
-    intlTitle = (lastNotification as ActivityInboxNotification).title
-    titleParams = (lastNotification as ActivityInboxNotification).intlParams
-  }
-
-  if (intlTitle !== undefined && lastNotification.body !== undefined) {
-    const intlParams = lastNotification.intlParams ?? {}
-
-    if (lastNotification.intlParamsNotLocalized !== undefined) {
-      for (const param in lastNotification.intlParamsNotLocalized) {
-        const value = lastNotification.intlParamsNotLocalized[param]
-        intlParams[param] = await translate(value, {})
-      }
-    }
-    const title = await translate(intlTitle, titleParams ?? {})
-    const body = await translate(lastNotification.body, lastNotification.intlParams ?? {})
-
-    // Do not show notification if there is no translate
-    if (title === intlTitle as string || body === lastNotification.body as string) {
-      return undefined
-    }
-
-    return { title, body }
-  }
-
-  const title = await translate(desktopPreferences.string.HaveGotANotification, {})
-
-  // Do not show notification if there is no translate
-  if (title === lastNotification.title as string) {
-    return undefined
-  }
-
-  const noPersonData = {
-    title,
-    body: ''
-  }
-
-  const account = await client.getModel().findOne(contact.class.PersonAccount, { _id: lastNotification.modifiedBy as Ref<PersonAccount> })
-
-  if (account == null) {
-    return noPersonData
-  }
-
-  const person = await client.findOne(contact.class.Person, { _id: account.person })
-
-  if (person == null) {
-    return noPersonData
-  }
-
-  return {
-    title,
-    body: formatName(person.name)
-  }
-}
-
-function getLasUnViewedNotification (
-  notifications: InboxNotification[],
-  notificationHistory: Map<string, number>
-): InboxNotification | undefined {
-  let lastNotification
-  let lastTime = 0
-
-  for (const n of notifications) {
-    if (notificationHistory.has(n._id as string)) {
-      continue
-    }
-
-    const createdOn = n.createdOn ?? n.modifiedOn
-
-    notificationHistory.set(n._id as string, createdOn)
-
-    if (createdOn > lastTime) {
-      lastTime = createdOn
-      lastNotification = n
-    }
-  }
-
-  return lastNotification
-}
-
-/**
- * @public
- */
-export function configureNotifications (): void {
-  let preferences = defaultNotificationPreference
-  let prevUnViewdNotificationsCount = 0
-
-  // For now we want to track all notifications which happends after the launch
-  // because we generate them on a client
-  let initTimestamp = 0
-  const notificationHistory = new Map<string, number>()
-
-  addEventListener(workbench.event.NotifyConnection, async (event, account: PersonAccount) => {
-    client = getClient()
-    const electronAPI: IPCMainExposed = (window as any).electron
-
-    const inboxClient = InboxNotificationsClientImpl.getClient()
-
-    async function handleNotifications (notificationsByContext: Map<Ref<DocNotifyContext>, InboxNotification[]>): Promise<void> {
-      const inboxData = await getDisplayInboxData(notificationsByContext)
-
-      if (notificationHistory.size === 0) {
-        for (const [, notifications] of inboxData) {
-          for (const n of notifications) {
-            notificationHistory.set(n._id as string, n.createdOn ?? n.modifiedOn)
-          }
-        }
-      }
-
-      const unViewedNotifications: InboxNotification[] = Array.from(inboxData.values()).flat().filter(({ isViewed }) => !isViewed)
-      // const notificationsAfterLaunch = notifications.filter((p) => p.txes.some((p) => p.modifiedOn > initTimestamp))
-      // We need to get the most recent notifications
-
-      if (prevUnViewdNotificationsCount !== unViewedNotifications.length) {
-        if (preferences.showUnreadCounter) {
-          electronAPI.setBadge(unViewedNotifications.length)
-        }
-        if (preferences.bounceAppIcon) {
-          electronAPI.dockBounce()
-        }
-        prevUnViewdNotificationsCount = unViewedNotifications.length
-      }
-
-      const notification = getLasUnViewedNotification(unViewedNotifications, notificationHistory)
-
-      if (preferences.showNotifications && initTimestamp > 0 && notification !== undefined) {
-        // const notification = notificationsAfterLaunch[notificationsAfterLaunch.length - 1]
-        const notificationData = await hydrateNotificationAsYouCan(notification)
-        if (notificationData !== undefined) {
-          if (notificationData.body === '') {
-            notificationData.body = await translate(desktopPreferences.string.TotalNotificationsCount, {
-              count: prevUnViewdNotificationsCount
-            })
-          }
-
-          electronAPI.sendNotification({
-            silent: !preferences.playSound,
-            ...notificationData
-          })
-        }
-      }
-
-      if (initTimestamp === 0) {
-        initTimestamp = Date.now()
-      }
-    }
-
-    inboxClient.inboxNotificationsByContext.subscribe(data => {
-      void handleNotifications(data)
-    })
-
-    activePreferences.subscribe((newPreferences) => {
-      if (preferences.showUnreadCounter && !newPreferences.showUnreadCounter) {
-        electronAPI.setBadge(0)
-      }
-      if (!preferences.showUnreadCounter && newPreferences.showUnreadCounter) {
-        electronAPI.setBadge(prevUnViewdNotificationsCount)
-      }
-      preferences = newPreferences
-    })
+export function defineNotifications (builder: Builder): void {
+  builder.mixin(chunter.class.DirectMessage, core.class.Class, notification.mixin.ClassCollaborators, {
+    fields: ['members']
   })
 
-  addEventListener(workbench.event.NotifyTitle, async (event, title: string) => {
-    ;((window as any).electron as IPCMainExposed).setTitle(title)
+  builder.mixin(chunter.class.Channel, core.class.Class, notification.mixin.ClassCollaborators, {
+    fields: ['members']
   })
 
-  location.subscribe((location) => {
-    if (!(location.path[0] === workbenchId || location.path[0] === workbench.component.WorkbenchApp)) {
-      // We need to clear badge
-      ;((window as any).electron as IPCMainExposed).setBadge(0)
-    }
+  builder.mixin(chunter.class.DirectMessage, core.class.Class, notification.mixin.NotificationPreview, {
+    presenter: chunter.component.ChannelPreview
+  })
+
+  builder.mixin(chunter.class.ChatMessage, core.class.Class, notification.mixin.NotificationContextPresenter, {
+    labelPresenter: chunter.component.ChatMessageNotificationLabel
+  })
+
+  builder.createDoc(notification.class.ActivityNotificationViewlet, core.space.Model, {
+    messageMatch: {
+      _class: chunter.class.ThreadMessage
+    },
+    presenter: chunter.component.ThreadNotificationPresenter
+  })
+
+  builder.createDoc(
+    notification.class.NotificationGroup,
+    core.space.Model,
+    {
+      label: chunter.string.ApplicationLabelChunter,
+      icon: chunter.icon.Chunter
+    },
+    chunter.ids.ChunterNotificationGroup
+  )
+
+  builder.createDoc(
+    notification.class.NotificationType,
+    core.space.Model,
+    {
+      label: chunter.string.DM,
+      generated: false,
+      hidden: false,
+      txClasses: [core.class.TxCreateDoc],
+      objectClass: chunter.class.ChatMessage,
+      attachedToClass: chunter.class.DirectMessage,
+      defaultEnabled: false,
+      group: chunter.ids.ChunterNotificationGroup,
+      templates: {
+        textTemplate: '{sender} has sent you a message: {doc} {message}',
+        htmlTemplate: '<p><b>{sender}</b> has sent you a message {doc}</p> {message}',
+        subjectTemplate: 'You have new direct message in {doc}'
+      }
+    },
+    chunter.ids.DMNotification
+  )
+
+  builder.createDoc(
+    notification.class.NotificationType,
+    core.space.Model,
+    {
+      label: chunter.string.ChannelMessages,
+      generated: false,
+      hidden: false,
+      txClasses: [core.class.TxCreateDoc],
+      objectClass: chunter.class.ChatMessage,
+      attachedToClass: chunter.class.Channel,
+      defaultEnabled: false,
+      group: chunter.ids.ChunterNotificationGroup,
+      templates: {
+        textTemplate: '{sender} has sent a message in {doc}: {message}',
+        htmlTemplate: '<p><b>{sender}</b> has sent a message in {doc}</p> {message}',
+        subjectTemplate: 'You have new message in {doc}'
+      }
+    },
+    chunter.ids.ChannelNotification
+  )
+
+  builder.createDoc(
+    notification.class.NotificationType,
+    core.space.Model,
+    {
+      label: chunter.string.JoinChannel,
+      generated: false,
+      hidden: false,
+      txClasses: [core.class.TxUpdateDoc],
+      objectClass: chunter.class.Channel,
+      defaultEnabled: false,
+      field: 'members',
+      group: chunter.ids.ChunterNotificationGroup,
+      templates: {
+        textTemplate: 'You have been added to #{doc}',
+        htmlTemplate: '<p>You have been added to <b>#{doc}</b></p>',
+        subjectTemplate: 'You have been added to #{doc}'
+      }
+    },
+    chunter.ids.JoinChannelNotification
+  )
+
+  builder.createDoc(
+    notification.class.NotificationType,
+    core.space.Model,
+    {
+      label: chunter.string.ThreadMessage,
+      generated: false,
+      hidden: false,
+      txClasses: [core.class.TxCreateDoc],
+      objectClass: chunter.class.ThreadMessage,
+      defaultEnabled: false,
+      group: chunter.ids.ChunterNotificationGroup,
+      templates: {
+        textTemplate: '{sender} replied to {doc}:\n\n{message}',
+        htmlTemplate: '<p><b>{sender}</b> replied to {doc}:</p><p>{message}</p><p>{link}</p>',
+        subjectTemplate: '{title}'
+      }
+    },
+    chunter.ids.ThreadNotification
+  )
+
+  builder.createDoc(notification.class.NotificationProviderDefaults, core.space.Model, {
+    provider: notification.providers.InboxNotificationProvider,
+    ignoredTypes: [],
+    enabledTypes: [
+      chunter.ids.DMNotification,
+      chunter.ids.ChannelNotification,
+      chunter.ids.ThreadNotification,
+      chunter.ids.JoinChannelNotification
+    ]
+  })
+
+  builder.createDoc(notification.class.NotificationProviderDefaults, core.space.Model, {
+    provider: notification.providers.PushNotificationProvider,
+    ignoredTypes: [],
+    enabledTypes: [
+      chunter.ids.DMNotification,
+      chunter.ids.ChannelNotification,
+      chunter.ids.ThreadNotification,
+      chunter.ids.JoinChannelNotification
+    ]
+  })
+
+  builder.createDoc(notification.class.ActivityNotificationViewlet, core.space.Model, {
+    messageMatch: {
+      _class: activity.class.DocUpdateMessage,
+      objectClass: chunter.class.Channel,
+      action: 'update',
+      'attributeUpdates.attrKey': 'members'
+    },
+    presenter: chunter.component.JoinChannelNotificationPresenter
   })
 }
