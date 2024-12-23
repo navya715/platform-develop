@@ -13,29 +13,6 @@
 // limitations under the License.
 //
 
-import { Attribute } from '@tiptap/core'
+import { ServerKit } from './kits/server-kit'
 
-/**
- * @public
- */
-export function getDataAttribute (
-  name: string,
-  options?: Partial<Omit<Attribute, 'parseHTML' | 'renderHTML'>>
-): Partial<Attribute> {
-  const dataName = `data-${name}`
-
-  return {
-    default: null,
-    parseHTML: (element) => element.getAttribute(dataName),
-    renderHTML: (attributes) => {
-      if (attributes[name] == null) {
-        return null
-      }
-
-      return {
-        [dataName]: attributes[name]
-      }
-    },
-    ...(options ?? {})
-  }
-}
+export const defaultExtensions = [ServerKit]

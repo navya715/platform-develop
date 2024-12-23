@@ -1,5 +1,5 @@
 //
-// Copyright © 2024 Hardcore Engineering Inc.
+// Copyright © 2023 Hardcore Engineering Inc.
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -12,93 +12,158 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+import type { Blob, Ref } from '@hcengineering/core'
+import { Node, mergeAttributes } from '@tiptap/core'
+import { getDataAttribute } from './utils'
 
-import extract from 'png-chunks-extract'
+/**
+ * @public
+ */
+export interface ImageOptions {
+  inline: boolean
+  HTMLAttributes: Record<string, any>
 
-export function imageSizeToRatio (width: number, pixelRatio: number): number {
-  // consider pixel ratio < 2 as non retina and display them in original size
-  return pixelRatio < 2 ? width : Math.round(width / pixelRatio)
+  loadingImgSrc?: string
+  getBlobRef: (fileId: Ref<Blob>, filename?: string, size?: number) => Promise<{ src: string, srcset: string }>
 }
 
-export async function getImageSize (file: Blob): Promise<{ width: number, height: number, pixelRatio: number }> {
-  const size = isPng(file) ? await getPngImageSize(file) : undefined
+/**
+ * @public
+ */
+export const ImageNode = Node.create<ImageOptions>({
+  name: 'image',
 
-  const promise = new Promise<{ width: number, height: number, pixelRatio: number }>((resolve, reject) => {
-    const img = new Image()
-
-    const src = URL.createObjectURL(file)
-
-    img.onload = () => {
-      URL.revokeObjectURL(src)
-      resolve({
-        width: size?.width ?? img.naturalWidth,
-        height: size?.height ?? img.naturalHeight,
-        pixelRatio: size?.pixelRatio ?? 1
-      })
-    }
-
-    img.onerror = reject
-    img.src = src
-  })
-
-  return await promise
-}
-
-function isPng (file: Blob): boolean {
-  return file.type === 'image/png'
-}
-
-async function getPngImageSize (file: Blob): Promise<{ width: number, height: number, pixelRatio: number } | undefined> {
-  if (!isPng(file)) {
-    return undefined
-  }
-
-  try {
-    const buffer = await file.arrayBuffer()
-    const chunks = extract(new Uint8Array(buffer))
-
-    const pHYsChunk = chunks.find((chunk) => chunk.name === 'pHYs')
-    const iHDRChunk = chunks.find((chunk) => chunk.name === 'IHDR')
-
-    if (pHYsChunk === undefined || iHDRChunk === undefined) {
-      return undefined
-    }
-
-    // See http://www.libpng.org/pub/png/spec/1.2/PNG-Chunks.html
-    // Section 4.1.1. IHDR Image header
-    // Section 4.2.4.2. pHYs Physical pixel dimensions
-    const idhrData = parseIHDR(new DataView(iHDRChunk.data.buffer))
-    const physData = parsePhys(new DataView(pHYsChunk.data.buffer))
-
-    // Assuming pixels are square
-    // http://www.libpng.org/pub/png/spec/1.2/PNG-Decoders.html#D.Pixel-dimensions
-    const pixelRatio = Math.round(physData.ppux * 0.0254) / 72
+  addOptions () {
     return {
-      width: idhrData.width,
-      height: idhrData.height,
-      pixelRatio
+      inline: true,
+      HTMLAttributes: {},
+      getBlobRef: async () => ({ src: '', srcset: '' })
     }
-  } catch (err) {
-    console.error(err)
-    return undefined
-  }
-}
+  },
 
-// See http://www.libpng.org/pub/png/spec/1.2/PNG-Chunks.html
-// Section 4.1.1. IHDR Image header
-function parseIHDR (view: DataView): { width: number, height: number } {
-  return {
-    width: view.getUint32(0),
-    height: view.getUint32(4)
-  }
-}
+  inline () {
+    return this.options.inline
+  },
 
-// See http://www.libpng.org/pub/png/spec/1.2/PNG-Chunks.html
-// Section 4.2.4.2. pHYs Physical pixel dimensions
-function parsePhys (view: DataView): { ppux: number, ppuy: number, unit: number } {
-  return {
-    ppux: view.getUint32(0),
-    ppuy: view.getUint32(4),
-    unit: view.getUint8(4)
+  group () {
+    return this.options.inline ? 'inline' : 'block'
+  },
+
+  draggable: true,
+
+  selectable: true,
+
+  addAttributes () {
+    return {
+      'file-id': {
+        default: null
+      },
+      width: {
+        default: null
+      },
+      height: {
+        default: null
+      },
+      src: {
+        default: null
+      },
+      alt: {
+        default: null
+      },
+      title: {
+        default: null
+      },
+      align: getDataAttribute('align'),
+      'data-file-type': {
+        default: null
+      }
+    }
+  },
+
+  parseHTML () {
+    return [
+      {
+        tag: `img[data-type="${this.name}"]`
+      },
+      {
+        tag: 'img[src]'
+      }
+    ]
+  },
+
+  renderHTML ({ node, HTMLAttributes }) {
+    const divAttributes = {
+      class: 'text-editor-image-container',
+      'data-type': this.name,
+      'data-align': node.attrs.align
+    }
+    const imgAttributes = mergeAttributes(
+      {
+        'data-type': this.name
+      },
+      this.options.HTMLAttributes,
+      HTMLAttributes
+    )
+    const fileId = imgAttributes['file-id']
+    if (fileId != null) {
+      imgAttributes.src = `platform://platform/files/workspace/?file=${fileId}`
+    }
+
+    return ['div', divAttributes, ['img', imgAttributes]]
+  },
+  addNodeView () {
+    return ({ node, HTMLAttributes }) => {
+      const container = document.createElement('div')
+      const imgElement = document.createElement('img')
+      container.append(imgElement)
+      const divAttributes = {
+        class: 'text-editor-image-container',
+        'data-type': this.name,
+        'data-align': node.attrs.align
+      }
+
+      for (const [k, v] of Object.entries(divAttributes)) {
+        if (v !== null) {
+          container.setAttribute(k, v)
+        }
+      }
+
+      const imgAttributes = mergeAttributes(
+        {
+          'data-type': this.name
+        },
+        this.options.HTMLAttributes,
+        HTMLAttributes
+      )
+      for (const [k, v] of Object.entries(imgAttributes)) {
+        if (k !== 'src' && k !== 'srcset' && v !== null) {
+          imgElement.setAttribute(k, v)
+        }
+      }
+      const fileId = imgAttributes['file-id']
+      if (fileId != null) {
+        const setBrokenImg = setTimeout(() => {
+          imgElement.src = this.options.loadingImgSrc ?? `platform://platform/files/workspace/?file=${fileId}`
+        }, 500)
+        if (fileId != null) {
+          void this.options.getBlobRef(fileId).then((val) => {
+            clearTimeout(setBrokenImg)
+            imgElement.src = val.src
+            imgElement.srcset = val.srcset
+          })
+        }
+      } else {
+        if (imgAttributes.srcset != null) {
+          imgElement.srcset = imgAttributes.srcset
+        }
+        if (imgAttributes.src != null) {
+          imgElement.src = imgAttributes.src
+        }
+      }
+
+      return {
+        dom: container
+      }
+    }
   }
-}
+})

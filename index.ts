@@ -1,42 +1,82 @@
-import { Extensions } from '@tiptap/core'
-import { defaultExtensions } from '../extensions'
-import { MarkdownParser } from './parser'
-import { MarkdownState, storeMarks, storeNodes } from './serializer'
-import { MarkupNode } from '../markup/model'
-import { markupToJSON } from '../markup/utils'
+//
+// Copyright © 2020 Anticrm Platform Contributors.
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+import { Analytics } from '@hcengineering/analytics'
+import '@hcengineering/platform-rig/profiles/ui/svelte'
+import { derived, writable } from 'svelte/store'
+
+export { default as Theme } from './Theme.svelte'
 
 /**
  * @public
  */
-export function parseMessageMarkdown (
-  message: string | undefined,
-  imageUrl: string,
-  refUrl: string = 'ref://',
-  extensions: Extensions = defaultExtensions
-): MarkupNode {
-  const parser = new MarkdownParser(extensions, refUrl, imageUrl)
-  return parser.parse(message ?? '')
+export const setDefaultLanguage = (language: string): void => {
+  if (localStorage.getItem('lang') === null) {
+    localStorage.setItem('lang', language)
+  }
+}
+
+function getDefaultProps (prop: string, value: string): string {
+  localStorage.setItem(prop, value)
+  return value
 }
 
 /**
  * @public
  */
-export function serializeMessage (node: MarkupNode, refUrl: string, imageUrl: string): string {
-  const state = new MarkdownState(storeNodes, storeMarks, { tightLists: true, refUrl, imageUrl })
-  state.renderContent(node)
-  return state.out
-}
-
+export const isSystemThemeDark = (): boolean => window.matchMedia('(prefers-color-scheme: dark)').matches
 /**
  * @public
  */
-export async function markupToMarkdown (
-  markup: string,
-  refUrl: string = 'ref://',
-  imageUrl: string = 'http://localhost',
-  preprocessor?: (nodes: MarkupNode) => Promise<void>
-): Promise<string> {
-  const json = markupToJSON(markup)
-  await preprocessor?.(json)
-  return serializeMessage(json, refUrl, imageUrl)
+export const isThemeDark = (theme: string): boolean =>
+  theme === 'theme-dark' || (theme === 'theme-system' && isSystemThemeDark())
+/**
+ * @public
+ */
+export const getCurrentTheme = (): string => localStorage.getItem('theme') ?? getDefaultProps('theme', 'theme-system')
+/**
+ * @public
+ */
+export const getCurrentFontSize = (): string =>
+  localStorage.getItem('fontsize') ?? getDefaultProps('fontsize', 'normal-font')
+/**
+ * @public
+ */
+export const getCurrentLanguage = (): string => {
+  const lang = localStorage.getItem('lang') ?? getDefaultProps('lang', 'en')
+  Analytics.setTag('language', lang)
+  return lang
 }
+
+export class ThemeOptions {
+  constructor (
+    readonly fontSize: number,
+    readonly dark: boolean,
+    readonly language: string
+  ) {}
+}
+export const themeStore = writable<ThemeOptions>()
+
+export function initThemeStore (): void {
+  themeStore.set(
+    new ThemeOptions(
+      getCurrentFontSize() === 'normal-font' ? 16 : 14,
+      isThemeDark(getCurrentTheme()),
+      getCurrentLanguage()
+    )
+  )
+}
+
+export const languageStore = derived(themeStore, ($theme) => $theme?.language ?? '')

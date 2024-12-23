@@ -1,5 +1,5 @@
 //
-// Copyright © 2023 Hardcore Engineering Inc.
+// Copyright © 2024 Hardcore Engineering Inc.
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -13,29 +13,27 @@
 // limitations under the License.
 //
 
-import { Attribute } from '@tiptap/core'
+import { Node } from '@tiptap/core'
 
 /**
  * @public
  */
-export function getDataAttribute (
-  name: string,
-  options?: Partial<Omit<Attribute, 'parseHTML' | 'renderHTML'>>
-): Partial<Attribute> {
-  const dataName = `data-${name}`
+export const CommentNode = Node.create({
+  name: 'comment',
+  group: 'inline',
+  inline: true,
+  content: 'text*',
+  marks: '_',
 
-  return {
-    default: null,
-    parseHTML: (element) => element.getAttribute(dataName),
-    renderHTML: (attributes) => {
-      if (attributes[name] == null) {
-        return null
+  parseHTML () {
+    return [
+      {
+        tag: 'comment'
       }
+    ]
+  },
 
-      return {
-        [dataName]: attributes[name]
-      }
-    },
-    ...(options ?? {})
+  renderText () {
+    return ''
   }
-}
+})
