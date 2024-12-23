@@ -14,23 +14,30 @@
 // limitations under the License.
 //
 
-import type { Metadata } from './metadata'
-
-export * from './event'
-export * from './i18n'
-export * from './metadata'
-export * from './platform'
-export { default } from './platform'
-export * from './resource'
-export * from './status'
-export * from './testUtils'
+import type { Id, Plugin } from './platform'
+import { PlatformError, Status, Severity } from './status'
+import platform, { _ID_SEPARATOR } from './platform'
 
 /**
- * @public
+ * @internal
  */
-export type URL = string
+export interface _IdInfo {
+  component: Plugin
+  kind: string
+  name: string
+}
 
 /**
- * @public
+ * @internal
  */
-export type Asset = Metadata<URL>
+export function _parseId (id: Id): _IdInfo {
+  const path = id.split(_ID_SEPARATOR)
+  if (path.length < 3) {
+    throw new PlatformError(new Status(Severity.ERROR, platform.status.InvalidId, { id }))
+  }
+  return {
+    component: path[0] as Plugin,
+    kind: path[1],
+    name: path.slice(2).join(_ID_SEPARATOR)
+  }
+}

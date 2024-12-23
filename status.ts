@@ -1,5 +1,5 @@
 //
-// Copyright © 2023 Hardcore Engineering Inc.
+// Copyright © 2020, 2021 Anticrm Platform Contributors.
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -13,41 +13,88 @@
 // limitations under the License.
 //
 
-import { Asset, IntlString } from '@hcengineering/platform'
-import { Attribute, Doc, Domain, Ref } from './classes'
+/**
+ * Anticrm Platform Foundation Types
+ * @packageDocumentation
+ */
+
+import type { StatusCode } from './platform'
+import platform from './platform'
 
 /**
+ * Status severity
  * @public
  */
-export interface StatusCategory extends Doc {
-  ofAttribute: Ref<Attribute<Status>>
-  icon: Asset
-  label: IntlString
-  color: number
-  defaultStatusName: string
-  order: number // category order
+export enum Severity {
+  OK = 'OK',
+  INFO = 'INFO',
+  WARNING = 'WARNING',
+  ERROR = 'ERROR'
 }
-/**
- * @public
- */
-export const DOMAIN_STATUS = 'status' as Domain
 
 /**
+ * Status of an operation
  * @public
- *
- * Status is attached to attribute, and if user attribute will be removed, all status values will be remove as well.
  */
-export interface Status extends Doc {
-  // We attach to attribute, so we could distinguish between
-  ofAttribute: Ref<Attribute<Status>>
-  // Optional category.
-  category?: Ref<StatusCategory>
+export class Status<P extends Record<string, any> = any> {
+  readonly severity: Severity
+  readonly code: StatusCode<P>
+  readonly params: P
 
-  // Status with case insensitivity name match will be assumed same.
-  name: string
+  constructor (severity: Severity, code: StatusCode<P>, params: P) {
+    this.severity = severity
+    this.code = code
+    this.params = params
+  }
+}
 
-  // Optional color
-  color?: number
-  // Optional description
-  description?: string
+/**
+ * Error object wrapping `Status`
+ * @public
+ */
+export class PlatformError<P extends Record<string, any>> extends Error {
+  readonly status: Status<P>
+
+  constructor (status: Status<P>) {
+    super(`${status.severity}: ${status.code} ${JSON.stringify(status.params)}`)
+    this.status = status
+  }
+}
+
+/**
+ * OK Status
+ * @public
+ */
+export const OK = new Status(Severity.OK, platform.status.OK, {})
+
+/**
+ * Error Status
+ * @public
+ */
+export const ERROR = new Status(Severity.ERROR, platform.status.BadError, {})
+
+/**
+ * Error Status for Unauthorized
+ * @public
+ */
+export const UNAUTHORIZED = new Status(Severity.ERROR, platform.status.Unauthorized, {})
+
+/**
+ * @public
+ * @param message -
+ * @returns
+ */
+export function unknownStatus (message: string): Status<any> {
+  return new Status(Severity.ERROR, platform.status.UnknownError, { message })
+}
+
+/**
+ * Creates unknown error status
+ * @public
+ */
+export function unknownError (err: unknown): Status {
+  if (err instanceof PlatformError) return err.status
+  if (err instanceof Error) return unknownStatus(err.message)
+  if (typeof err === 'string') return unknownStatus(err)
+  return ERROR
 }

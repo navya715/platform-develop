@@ -1,6 +1,5 @@
 //
-// Copyright © 2020, 2021 Anticrm Platform Contributors.
-// Copyright © 2021 Hardcore Engineering Inc.
+// Copyright © 2024 Hardcore Engineering Inc.
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -13,24 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-
-import type { Metadata } from './metadata'
-
-export * from './event'
-export * from './i18n'
-export * from './metadata'
-export * from './platform'
-export { default } from './platform'
-export * from './resource'
-export * from './status'
-export * from './testUtils'
-
-/**
- * @public
- */
-export type URL = string
-
-/**
- * @public
- */
-export type Asset = Metadata<URL>
+export async function download (url: string): Promise<Blob | null> {
+  try {
+    const response = await fetch(url)
+    if (!response.ok) {
+      console.error(`Failed to fetch from ${url}: ${response.status} ${response.statusText}`)
+      return null
+    }
+    return await response.blob()
+  } catch (err) {
+    console.error(`Error downloading from ${url}:`, err instanceof Error ? err.message : err)
+    return null
+  }
+}

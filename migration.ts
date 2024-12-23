@@ -1,234 +1,294 @@
-//
-// Copyright © 2022 Hardcore Engineering Inc.
-//
-// Licensed under the Eclipse Public License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License. You may
-// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//
-// See the License for the specific language governing permissions and
-// limitations under the License.
-//
-
-import { getCategories } from '@anticrm/skillset'
+import { Analytics } from '@hcengineering/analytics'
 import core, {
-  DOMAIN_MODEL_TX,
-  toIdMap,
+  Class,
+  Client,
+  DOMAIN_MIGRATION,
+  DOMAIN_TX,
+  Data,
+  Doc,
+  DocumentQuery,
+  Domain,
+  FindOptions,
+  Hierarchy,
+  IncOptions,
+  MigrationState,
+  ModelDb,
+  ObjQueryType,
+  PushOptions,
+  Rank,
+  Ref,
+  SortingOrder,
+  Space,
   TxOperations,
-  type Doc,
-  type Ref,
-  type Space,
-  type Status
+  UnsetOptions,
+  WorkspaceId,
+  generateId
 } from '@hcengineering/core'
-import {
-  createOrUpdate,
-  migrateSpace,
-  tryMigrate,
-  tryUpgrade,
-  type MigrateOperation,
-  type MigrationClient,
-  type MigrationUpgradeClient,
-  type ModelLogger
-} from '@hcengineering/model'
-import tags, { type TagCategory } from '@hcengineering/model-tags'
-import task, { createSequence, DOMAIN_TASK, migrateDefaultStatusesBase } from '@hcengineering/model-task'
-import { recruitId, type Applicant } from '@hcengineering/recruit'
+import { makeRank } from '@hcengineering/rank'
+import { StorageAdapter } from '@hcengineering/storage'
+import { ModelLogger } from './utils'
 
-import { DOMAIN_CALENDAR } from '@hcengineering/model-calendar'
-import { DOMAIN_SPACE } from '@hcengineering/model-core'
-import recruit from './plugin'
-import { defaultApplicantStatuses } from './spaceType'
+/**
+ * @public
+ */
+export type MigrateUpdate<T extends Doc> = Partial<T> &
+PushOptions<T> &
+IncOptions<T> &
+UnsetOptions &
+Record<string, any>
 
-export const recruitOperation: MigrateOperation = {
-  async preMigrate (client: MigrationClient, logger: ModelLogger): Promise<void> {
-    await tryMigrate(client, recruitId, [
-      {
-        state: 'migrate-default-statuses',
-        func: (client) => migrateDefaultStatuses(client, logger)
-      }
-    ])
-  },
-  async migrate (client: MigrationClient): Promise<void> {
-    await tryMigrate(client, recruitId, [
-      {
-        state: 'identifier',
-        func: migrateIdentifiers
-      },
-      {
-        state: 'migrate-default-type-mixins',
-        func: async (client) => {
-          await migrateDefaultTypeMixins(client)
-        }
-      },
-      {
-        state: 'removeDeprecatedSpace',
-        func: async (client: MigrationClient) => {
-          await migrateSpace(client, 'recruit:space:Reviews' as Ref<Space>, core.space.Workspace, [DOMAIN_CALENDAR])
-        }
-      },
-      {
-        state: 'migrate-applicants',
-        func: async (client: MigrationClient) => {
-          await client.update(
-            DOMAIN_TASK,
-            { _class: recruit.class.Applicant, isDone: { $nin: [false, true] } },
-            { isDone: false }
-          )
-        }
-      }
-    ])
-  },
-  async upgrade (state: Map<string, Set<string>>, client: () => Promise<MigrationUpgradeClient>): Promise<void> {
-    await tryUpgrade(state, client, recruitId, [
-      {
-        state: 'create-defaults-v2',
-        func: async (client) => {
-          const tx = new TxOperations(client, core.account.System)
-          await createDefaults(client, tx)
-        }
-      }
-    ])
+/**
+ * @public
+ */
+export interface MigrationResult {
+  matched: number
+  updated: number
+}
+
+/**
+ * @public
+ */
+export type MigrationDocumentQuery<T extends Doc> = {
+  [P in keyof T]?: ObjQueryType<T[P]> | null
+} & {
+  $search?: string
+  // support nested queries e.g. 'user.friends.name'
+  // this will mark all unrecognized properties as any (including nested queries)
+  [key: string]: any
+}
+
+/**
+ * @public
+ */
+export interface MigrationIterator<T extends Doc> {
+  next: (count: number) => Promise<T[] | null>
+  close: () => Promise<void>
+}
+
+/**
+ * @public
+ * Client to perform model upgrades
+ */
+export interface MigrationClient {
+  // Raw collection operations
+
+  // Raw FIND, allow to find documents inside domain.
+  find: <T extends Doc>(
+    domain: Domain,
+    query: MigrationDocumentQuery<T>,
+    options?: Omit<FindOptions<T>, 'lookup'>
+  ) => Promise<T[]>
+
+  // Traverse documents
+  traverse: <T extends Doc>(
+    domain: Domain,
+    query: MigrationDocumentQuery<T>,
+    options?: Pick<FindOptions<T>, 'sort' | 'limit' | 'projection'>
+  ) => Promise<MigrationIterator<T>>
+
+  // Allow to raw update documents inside domain.
+  update: <T extends Doc>(
+    domain: Domain,
+    query: MigrationDocumentQuery<T>,
+    operations: MigrateUpdate<T>
+  ) => Promise<void>
+
+  bulk: <T extends Doc>(
+    domain: Domain,
+    operations: { filter: MigrationDocumentQuery<T>, update: MigrateUpdate<T> }[]
+  ) => Promise<void>
+
+  // Move documents per domain
+  move: <T extends Doc>(
+    sourceDomain: Domain,
+    query: DocumentQuery<T>,
+    targetDomain: Domain,
+    size?: number
+  ) => Promise<void>
+
+  create: <T extends Doc>(domain: Domain, doc: T | T[]) => Promise<void>
+  delete: <T extends Doc>(domain: Domain, _id: Ref<T>) => Promise<void>
+  deleteMany: <T extends Doc>(domain: Domain, query: DocumentQuery<T>) => Promise<void>
+
+  hierarchy: Hierarchy
+  model: ModelDb
+
+  migrateState: Map<string, Set<string>>
+  storageAdapter: StorageAdapter
+
+  workspaceId: WorkspaceId
+}
+
+/**
+ * @public
+ */
+export type MigrationUpgradeClient = Client
+
+/**
+ * @public
+ */
+export interface MigrateOperation {
+  // Perform low level migration prior to the model update
+  preMigrate?: (client: MigrationClient, logger: ModelLogger) => Promise<void>
+  // Perform low level migration
+  migrate: (client: MigrationClient, logger: ModelLogger) => Promise<void>
+  // Perform high level upgrade operations.
+  upgrade: (
+    state: Map<string, Set<string>>,
+    client: () => Promise<MigrationUpgradeClient>,
+    logger: ModelLogger
+  ) => Promise<void>
+}
+
+/**
+ * @public
+ */
+export interface Migrations {
+  state: string
+  func: (client: MigrationClient) => Promise<void>
+}
+
+/**
+ * @public
+ */
+export interface UpgradeOperations {
+  state: string
+  func: (client: MigrationUpgradeClient) => Promise<void>
+}
+
+/**
+ * @public
+ */
+export async function tryMigrate (client: MigrationClient, plugin: string, migrations: Migrations[]): Promise<void> {
+  const states = client.migrateState.get(plugin) ?? new Set()
+  for (const migration of migrations) {
+    if (states.has(migration.state)) continue
+    try {
+      console.log('running migration', plugin, migration.state)
+      await migration.func(client)
+    } catch (err: any) {
+      console.error(err)
+      Analytics.handleError(err)
+      continue
+    }
+    const st: MigrationState = {
+      plugin,
+      state: migration.state,
+      space: core.space.Configuration,
+      modifiedBy: core.account.System,
+      modifiedOn: Date.now(),
+      _class: core.class.MigrationState,
+      _id: generateId()
+    }
+    await client.create(DOMAIN_MIGRATION, st)
   }
 }
 
-async function migrateIdentifiers (client: MigrationClient): Promise<void> {
-  const docs = await client.find<Applicant>(DOMAIN_TASK, {
-    _class: recruit.class.Applicant,
-    identifier: { $exists: false }
+/**
+ * @public
+ */
+export async function tryUpgrade (
+  state: Map<string, Set<string>>,
+  client: () => Promise<MigrationUpgradeClient>,
+  plugin: string,
+  migrations: UpgradeOperations[]
+): Promise<void> {
+  const states = state.get(plugin) ?? new Set()
+  for (const migration of migrations) {
+    if (states.has(migration.state)) continue
+    const _client = await client()
+    try {
+      await migration.func(_client)
+    } catch (err: any) {
+      console.error(err)
+      Analytics.handleError(err)
+      continue
+    }
+    const st: Data<MigrationState> = {
+      plugin,
+      state: migration.state
+    }
+    const tx = new TxOperations(_client, core.account.System)
+    await tx.createDoc(core.class.MigrationState, core.space.Configuration, st)
+  }
+}
+
+type DefaultSpaceData<T extends Space> = Pick<T, 'description' | 'private' | 'archived' | 'members'>
+type RequiredData<T extends Space> = Omit<Data<T>, keyof DefaultSpaceData<T>> & Partial<DefaultSpaceData<T>>
+
+/**
+ * @public
+ */
+export async function createDefaultSpace<T extends Space> (
+  client: MigrationUpgradeClient,
+  _id: Ref<T>,
+  props: RequiredData<T>,
+  _class: Ref<Class<T>> = core.class.SystemSpace
+): Promise<void> {
+  const defaults: DefaultSpaceData<T> = {
+    description: '',
+    private: false,
+    archived: false,
+    members: []
+  }
+  const data: Data<Space> = {
+    ...defaults,
+    ...props
+  }
+  const tx = new TxOperations(client, core.account.System)
+  const current = await tx.findOne(core.class.Space, {
+    _id
   })
-  for (const doc of docs) {
-    await client.update(
-      DOMAIN_TASK,
-      { _id: doc._id },
-      {
-        identifier: `APP-${doc.number}`
-      }
-    )
+  if (current === undefined || current._class !== _class) {
+    if (current !== undefined && current._class !== _class) {
+      await tx.remove(current)
+    }
+    await tx.createDoc(_class, core.space.Space, data, _id)
   }
 }
 
-async function migrateDefaultStatuses (client: MigrationClient, logger: ModelLogger): Promise<void> {
-  const defaultTypeId = recruit.template.DefaultVacancy
-  const typeDescriptor = recruit.descriptors.VacancyType
-  const baseClass = recruit.class.Vacancy
-  const defaultTaskTypeId = recruit.taskTypes.Applicant
-  const taskTypeClass = task.class.TaskType
-  const baseTaskClass = recruit.class.Applicant
-  const statusAttributeOf = recruit.attribute.State
-  const statusClass = core.class.Status
-  const getDefaultStatus = (oldStatus: Status): Ref<Status> | undefined => {
-    return defaultApplicantStatuses.find(
-      (defStatus) =>
-        defStatus.category === oldStatus.category &&
-        defStatus.name.toLowerCase() === oldStatus.name.trim().toLowerCase()
-    )?.id
+/**
+ * @public
+ */
+export async function migrateSpace (
+  client: MigrationClient,
+  from: Ref<Space>,
+  to: Ref<Space>,
+  domains: Domain[]
+): Promise<void> {
+  for (const domain of domains) {
+    await client.update(domain, { space: from }, { space: to })
   }
-
-  await migrateDefaultStatusesBase<Applicant>(
-    client,
-    logger,
-    defaultTypeId,
-    typeDescriptor,
-    baseClass,
-    defaultTaskTypeId,
-    taskTypeClass,
-    baseTaskClass,
-    statusAttributeOf,
-    statusClass,
-    getDefaultStatus
-  )
+  await client.update(DOMAIN_TX, { objectSpace: from }, { objectSpace: to })
 }
 
-async function migrateDefaultTypeMixins (client: MigrationClient): Promise<void> {
-  const oldSpaceTypeMixin = `${recruit.template.DefaultVacancy}:type:mixin`
-  const newSpaceTypeMixin = recruit.mixin.DefaultVacancyTypeData
-  const oldTaskTypeMixin = `${recruit.taskTypes.Applicant}:type:mixin`
-  const newTaskTypeMixin = recruit.mixin.ApplicantTypeData
+export async function migrateSpaceRanks (client: MigrationClient, domain: Domain, space: Space): Promise<void> {
+  type WithRank = Doc & { rank: Rank }
 
-  await client.update(
-    DOMAIN_MODEL_TX,
-    {
-      objectClass: core.class.Attribute,
-      'attributes.attributeOf': oldSpaceTypeMixin
-    },
-    {
-      $set: {
-        'attributes.attributeOf': newSpaceTypeMixin
+  const iterator = await client.traverse<WithRank>(
+    domain,
+    { space: space._id, rank: { $exists: true } },
+    { sort: { rank: SortingOrder.Ascending } }
+  )
+
+  try {
+    let rank = '0|100000:'
+
+    while (true) {
+      const docs = await iterator.next(1000)
+      if (docs === null || docs.length === 0) {
+        break
       }
-    }
-  )
 
-  await client.update(
-    DOMAIN_SPACE,
-    {
-      _class: recruit.class.Vacancy,
-      [oldSpaceTypeMixin]: { $exists: true }
-    },
-    {
-      $rename: {
-        [oldSpaceTypeMixin]: newSpaceTypeMixin
+      const updates: { filter: MigrationDocumentQuery<Doc<Space>>, update: MigrateUpdate<Doc<Space>> }[] = []
+      for (const doc of docs) {
+        rank = makeRank(rank, undefined)
+        updates.push({ filter: { _id: doc._id }, update: { rank } })
       }
+
+      await client.bulk(domain, updates)
     }
-  )
-
-  await client.update(
-    DOMAIN_TASK,
-    {
-      _class: recruit.class.Applicant,
-      [oldTaskTypeMixin]: { $exists: true }
-    },
-    {
-      $rename: {
-        [oldTaskTypeMixin]: newTaskTypeMixin
-      }
-    }
-  )
-}
-
-async function createDefaults (client: MigrationUpgradeClient, tx: TxOperations): Promise<void> {
-  await createOrUpdate(
-    tx,
-    tags.class.TagCategory,
-    core.space.Workspace,
-    {
-      icon: recruit.icon.Skills,
-      label: 'Other',
-      targetClass: recruit.mixin.Candidate,
-      tags: [],
-      default: true
-    },
-    recruit.category.Other
-  )
-  const ops = tx.apply()
-
-  const cats = getCategories().filter((it, idx, arr) => arr.findIndex((qt) => qt.id === it.id) === idx)
-
-  const existingCategories = toIdMap(
-    await client.findAll<Doc>(tags.class.TagCategory, { targetClass: recruit.mixin.Candidate })
-  )
-  for (const c of cats) {
-    await createOrUpdate(
-      ops,
-      tags.class.TagCategory,
-      core.space.Workspace,
-      {
-        icon: recruit.icon.Skills,
-        label: c.label,
-        targetClass: recruit.mixin.Candidate,
-        tags: c.skills,
-        default: false
-      },
-      (recruit.category.Category + '.' + c.id) as Ref<TagCategory>,
-      existingCategories
-    )
+  } finally {
+    await iterator.close()
   }
-  await ops.commit()
-
-  await createSequence(tx, recruit.class.Review)
-  await createSequence(tx, recruit.class.Opinion)
-  await createSequence(tx, recruit.class.Applicant)
-  await createSequence(tx, recruit.class.Vacancy)
 }

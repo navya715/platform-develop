@@ -14,23 +14,28 @@
 // limitations under the License.
 //
 
-import type { Metadata } from './metadata'
+import type { Plugin, IntlString, Resource } from '../platform'
+import { plugin } from '../platform'
+import { addLocation, getResource } from '../resource'
 
-export * from './event'
-export * from './i18n'
-export * from './metadata'
-export * from './platform'
-export { default } from './platform'
-export * from './resource'
-export * from './status'
-export * from './testUtils'
+describe('resource', () => {
+  const test = 'test' as Plugin
 
-/**
- * @public
- */
-export type URL = string
+  const testPlugin = plugin(test, {
+    string: {
+      Hello: '' as IntlString<{ name: string }>
+    },
+    test: {
+      X: '' as Resource<string>
+    }
+  })
 
-/**
- * @public
- */
-export type Asset = Metadata<URL>
+  addLocation(test, async () => await import('./plugin'))
+
+  it('should load resource', async () => {
+    const string = await getResource(testPlugin.test.X)
+    expect(string).toBe('Test')
+    const cached = await getResource(testPlugin.test.X)
+    expect(cached).toBe('Test')
+  })
+})
