@@ -13,54 +13,61 @@
 // limitations under the License.
 -->
 <script lang="ts">
-  import { Component, SelectPopup, showPopup } from '@hcengineering/ui'
-  import type { MouseTargetEvent } from '@hcengineering/ui'
-  import { NavLink } from '../..'
-  import { BreadcrumbsModel } from './types'
-  import { hasComponent } from './utils'
+  import { createEventDispatcher, ComponentType } from 'svelte'
+  import type { Asset, IntlString } from '@hcengineering/platform'
+  import { AnySvelteComponent, BreadcrumbItem } from '../types'
+  import ChevronRight from './icons/ChevronRight.svelte'
+  import Label from './Label.svelte'
+  import Breadcrumb from './Breadcrumb.svelte'
 
-  export let models: readonly BreadcrumbsModel[]
-  export let disabled: boolean = false
+  export let items: BreadcrumbItem[]
+  export let afterLabel: IntlString | undefined = undefined
+  export let size: 'large' | 'small' = 'large'
+  export let selected: number | null = null
+  export let currentOnly: boolean = false
+  export let hideAfter: boolean = false
 
-  $: trimmed = models.length > 3
-  $: narrowModel = trimmed ? [models[0], models[models.length - 1]] : models
-
-  const handleMenuOpened = (event: MouseTargetEvent) => {
-    event.preventDefault()
-    const items = models.slice(1, -1).map((m, i) => {
-      if (hasComponent(m)) {
-        const { component, props } = m
-        return { id: i, component, props }
-      } else {
-        const { title } = m
-        return { id: i, text: title }
-      }
-    })
-    showPopup(SelectPopup, { value: items, componentLink: true }, event.currentTarget)
-  }
+  const dispatch = createEventDispatcher()
 </script>
 
-{#each narrowModel as model, i}
-  {#if hasComponent(model)}
-    {@const { component, props } = model}
-    <div class="title">
-      {#if typeof component === 'string'}
-        <Component is={component} {props} />
-      {:else}
-        <svelte:component this={component} {...props} />
-      {/if}
-    </div>
-  {:else}
-    {@const { title, href, onClick } = model}
-    <NavLink {href} noUnderline {onClick} {disabled}>
-      <div class="title">{title}</div>
-    </NavLink>
+<div class="hulyBreadcrumbs-container {size}">
+  {#each items as item, i}
+    {#if i !== 0}<ChevronRight size={'small'} />{/if}
+    <Breadcrumb
+      {...item}
+      {size}
+      isCurrent={selected === i || currentOnly}
+      on:click={() => {
+        if (selected !== i) dispatch('select', i)
+      }}
+    />
+  {/each}
+  {#if (afterLabel || $$slots.afterLabel) && !hideAfter}
+    <span class="hulyBreadcrumbs-afterLabel font-medium-12">
+      {#if afterLabel}<Label label={afterLabel} />{/if}
+      <slot name="afterLabel" />
+    </span>
   {/if}
-  <div class="title disabled">/</div>
-  {#if trimmed && i === 0}
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <!-- svelte-ignore a11y-no-static-element-interactions -->
-    <div class="title" on:click={handleMenuOpened}>...</div>
-    <div class="title disabled">/</div>
-  {/if}
-{/each}
+</div>
+
+<style lang="scss">
+  .hulyBreadcrumbs-container {
+    display: flex;
+    align-items: center;
+    height: var(--global-small-Size);
+    min-width: 0;
+
+    .hulyBreadcrumbs-afterLabel {
+      max-width: 10rem;
+      white-space: nowrap;
+      word-break: break-all;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      padding: var(--spacing-0_25) var(--spacing-0_5);
+      text-transform: uppercase;
+      background-color: var(--global-ui-hover-BackgroundColor);
+      color: var(--global-secondary-TextColor);
+      border-radius: 0.25rem;
+    }
+  }
+</style>
