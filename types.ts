@@ -1,30 +1,30 @@
-import { type Doc, type Rank } from '@hcengineering/core'
-import { type Asset } from '@hcengineering/platform'
+// Copyright © 2023 Hardcore Engineering Inc.
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-/**
- * @public
- */
-export interface DocWithRank extends Doc {
-  rank: Rank
+import { type AnyComponent, type AnySvelteComponent } from '@hcengineering/ui'
+
+interface BreadcrumbsProps {
+  readonly color?: number | undefined
 }
 
-export type StateType = any
+type TextBreadcrumbsProps = { title: string } & (
+  | { readonly href: string, readonly onClick?: undefined }
+  | { readonly href?: undefined, readonly onClick: (event: MouseEvent) => void }
+)
 
-/**
- * @public
- */
-export interface TypeState {
-  _id: StateType
-  title: string
-  color: number
-  icon?: Asset
+export interface ComponentBreadcrumbsProps {
+  readonly component: AnyComponent | AnySvelteComponent
+  readonly props: Record<string, any>
 }
-/**
- * @public
- */
-export type Item = DocWithRank
 
-/**
- * @public
- */
-export type CardDragEvent = DragEvent & { currentTarget: EventTarget & HTMLDivElement }
+export type BreadcrumbsModel = BreadcrumbsProps & (TextBreadcrumbsProps | ComponentBreadcrumbsProps)
