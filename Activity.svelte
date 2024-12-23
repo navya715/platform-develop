@@ -1,16 +1,342 @@
+<!--
+// Copyright © 2022 Hardcore Engineering Inc.
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
+-->
 <script lang="ts">
-  export let size: 'small' | 'medium' | 'large'
-  const fill: string = 'currentColor'
+  import activity, {
+    ActivityExtension,
+    ActivityMessage,
+    ActivityReference,
+    DisplayActivityMessage,
+    WithReferences
+  } from '@hcengineering/activity'
+  import { Doc, Ref, SortingOrder } from '@hcengineering/core'
+  import { createQuery, getClient } from '@hcengineering/presentation'
+  import { Grid, Label, Section, Spinner, location, Lazy } from '@hcengineering/ui'
+  import { onDestroy, onMount } from 'svelte'
+
+  import ActivityExtensionComponent from './ActivityExtension.svelte'
+  import ActivityFilter from './ActivityFilter.svelte'
+  import { combineActivityMessages, sortActivityMessages } from '../activityMessagesUtils'
+  import { canGroupMessages, getMessageFromLoc, getSpace } from '../utils'
+  import ActivityMessagePresenter from './activity-message/ActivityMessagePresenter.svelte'
+  import { messageInFocus } from '../activity'
+
+  export let object: WithReferences<Doc>
+  export let showCommenInput: boolean = true
+  export let transparent: boolean = false
+  export let focusIndex: number = -1
+  export let boundary: HTMLElement | undefined = undefined
+
+  const client = getClient()
+  const activityMessagesQuery = createQuery()
+  const refsQuery = createQuery()
+
+  let extensions: ActivityExtension[] = []
+
+  let filteredMessages: DisplayActivityMessage[] = []
+  let allMessages: ActivityMessage[] = []
+  let messages: ActivityMessage[] = []
+  let refs: ActivityReference[] = []
+
+  let isMessagesLoading = false
+  let isRefsLoading = true
+
+  let activityBox: HTMLElement | undefined
+  let selectedMessageId: Ref<ActivityMessage> | undefined = undefined
+
+  let shouldScroll = true
+  let isAutoScroll = false
+  let prevScrollTimestamp = 0
+  let timer: any
+
+  let prevContainerHeight = -1
+  let prevContainerWidth = -1
+
+  const unsubscribe = messageInFocus.subscribe((id) => {
+    if (id !== undefined) {
+      selectedMessageId = id
+      shouldScroll = true
+      void scrollToMessage(id)
+      messageInFocus.set(undefined)
+    }
+  })
+
+  const unsubscribeLocation = location.subscribe((loc) => {
+    const id = getMessageFromLoc(loc)
+
+    if (id === undefined) {
+      boundary?.scrollTo({ top: 0 })
+      selectedMessageId = undefined
+    }
+
+    messageInFocus.set(id)
+  })
+
+  onMount(() => {
+    if (!boundary) {
+      return
+    }
+
+    boundary.addEventListener('wheel', () => {
+      shouldScroll = false
+    })
+
+    boundary.addEventListener('scroll', (a) => {
+      const diff = a.timeStamp - prevScrollTimestamp
+
+      if (!isAutoScroll) {
+        shouldScroll = false
+      }
+
+      isAutoScroll = isAutoScroll ? diff < 100 || prevScrollTimestamp === 0 : false
+      prevScrollTimestamp = a.timeStamp
+    })
+  })
+
+  onDestroy(() => {
+    unsubscribe()
+    unsubscribeLocation()
+  })
+
+  function restartAnimation (el: HTMLElement): void {
+    el.style.animation = 'none'
+    el.focus()
+    el.style.animation = ''
+  }
+
+  function tryScrollToMessage (delay: number = 100): void {
+    if (timer) {
+      clearTimeout(timer)
+    }
+    timer = setTimeout(() => {
+      void scrollToMessage(selectedMessageId)
+    }, delay)
+  }
+
+  async function scrollToMessage (id?: Ref<ActivityMessage>): Promise<void> {
+    if (!id || boundary == null || activityBox == null) {
+      return
+    }
+
+    const messagesElements = activityBox.getElementsByClassName('activityMessage')
+    const msgElement = messagesElements[id as any] as HTMLElement | undefined
+
+    if (msgElement == null && filteredMessages.some((msg) => msg._id === id)) {
+      tryScrollToMessage()
+      return
+    } else if (msgElement == null) {
+      return
+    }
+
+    shouldScroll = true
+    isAutoScroll = true
+    prevScrollTimestamp = 0
+
+    restartAnimation(msgElement)
+    msgElement.scrollIntoView({ behavior: 'instant' })
+  }
+
+  export function onContainerResized (container: HTMLElement): void {
+    if (!shouldScroll) return
+
+    if (prevContainerWidth > 0 && container.clientWidth !== prevContainerWidth) {
+      shouldScroll = false
+      return
+    }
+
+    if (
+      selectedMessageId &&
+      container.clientHeight !== prevContainerHeight &&
+      container.clientHeight > prevContainerHeight
+    ) {
+      // A little delay to avoid a lot of jumping/twitching
+      tryScrollToMessage(300)
+    }
+
+    prevContainerHeight = container.clientHeight
+    prevContainerWidth = container.clientWidth
+  }
+
+  let isNewestFirst = JSON.parse(localStorage.getItem('activity-newest-first') ?? 'false')
+
+  $: void client.findAll(activity.class.ActivityExtension, { ofClass: object._class }).then((res) => {
+    extensions = res
+  })
+
+  // Load references from other spaces separately because they can have any different spaces
+  $: if ((object.references ?? 0) > 0) {
+    refsQuery.query(
+      activity.class.ActivityReference,
+      { attachedTo: object._id, space: { $ne: getSpace(object) } },
+      (res) => {
+        refs = res
+        isRefsLoading = false
+      },
+      {
+        sort: {
+          createdOn: SortingOrder.Ascending
+        }
+      }
+    )
+  } else {
+    isRefsLoading = false
+    refsQuery.unsubscribe()
+  }
+
+  $: allMessages = sortActivityMessages(messages.concat(refs))
+
+  async function updateActivityMessages (objectId: Ref<Doc>, order: SortingOrder): Promise<void> {
+    isMessagesLoading = true
+
+    const res = activityMessagesQuery.query(
+      activity.class.ActivityMessage,
+      { attachedTo: objectId, space: getSpace(object) },
+      (result: ActivityMessage[]) => {
+        void combineActivityMessages(result, order).then((res) => {
+          messages = res
+          isMessagesLoading = false
+        })
+      },
+      {
+        sort: {
+          createdOn: SortingOrder.Ascending
+        },
+        lookup: {
+          _id: {
+            reactions: activity.class.Reaction
+          }
+        }
+      }
+    )
+    if (!res) {
+      isMessagesLoading = false
+    }
+  }
+
+  $: isLoading = isMessagesLoading || isRefsLoading
+  $: areMessagesLoaded = !isLoading && filteredMessages.length > 0
+
+  $: if (activityBox && areMessagesLoaded) {
+    shouldScroll = true
+    void scrollToMessage(selectedMessageId)
+  }
+
+  $: void updateActivityMessages(object._id, isNewestFirst ? SortingOrder.Descending : SortingOrder.Ascending)
 </script>
 
-<svg class="svg-{size}" {fill} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
-  <path
-    d="M7.1,6.9C7,6.8,6.9,6.7,6.8,6.8C6.6,6.8,6.5,6.9,6.4,7l-2,2.6c-0.2,0.2-0.1,0.5,0.1,0.7c0.1,0.1,0.2,0.1,0.3,0.1 c0.1,0,0.3-0.1,0.4-0.2L6.9,8l1.9,1.5C8.9,9.5,9,9.6,9.2,9.5c0.1,0,0.3-0.1,0.3-0.2l2-2.5c0.2-0.2,0.1-0.5-0.1-0.7 C11.1,6,10.8,6,10.7,6.2L9,8.3L7.1,6.9z"
-  />
-  <path
-    d="M13.3,4.6c1,0,1.8-0.8,1.8-1.8S14.3,1,13.3,1s-1.8,0.8-1.8,1.8S12.3,4.6,13.3,4.6z M13.3,2c0.4,0,0.8,0.4,0.8,0.8 c0,0.4-0.4,0.8-0.8,0.8s-0.8-0.4-0.8-0.8C12.5,2.4,12.9,2,13.3,2z"
-  />
-  <path
-    d="M14.1,5.7c-0.3,0-0.5,0.2-0.5,0.5v4.7c0,1.8-1.1,2.9-2.8,2.9H5.1c-1.7,0-2.8-1.1-2.8-2.9V5.5c0-1.8,1.1-2.9,2.8-2.9h4.8 c0.3,0,0.5-0.2,0.5-0.5s-0.2-0.5-0.5-0.5H5.1c-2.2,0-3.8,1.6-3.8,3.9v5.4c0,2.3,1.5,3.9,3.8,3.9h5.7c2.2,0,3.8-1.6,3.8-3.9V6.2 C14.6,5.9,14.4,5.7,14.1,5.7z"
-  />
-</svg>
+<div class="step-tb-6">
+  <Section label={activity.string.Activity} icon={activity.icon.Activity}>
+    <svelte:fragment slot="header">
+      {#if isLoading}
+        <div class="ml-1">
+          <Spinner size="small" />
+        </div>
+      {/if}
+      <ActivityFilter
+        messages={allMessages}
+        {object}
+        on:update={(e) => {
+          filteredMessages = e.detail
+        }}
+        bind:isNewestFirst
+      />
+    </svelte:fragment>
+
+    <svelte:fragment slot="content">
+      {#if isNewestFirst && showCommenInput}
+        <div class="ref-input newest-first">
+          <ActivityExtensionComponent
+            kind="input"
+            {extensions}
+            props={{ object, boundary, focusIndex, withTypingInfo: true }}
+          />
+        </div>
+      {/if}
+      <div
+        class="p-activity select-text"
+        id={activity.string.Activity}
+        class:newest-first={isNewestFirst}
+        bind:this={activityBox}
+      >
+        {#if filteredMessages.length}
+          <Grid column={1} rowGap={0}>
+            {#each filteredMessages as message, index}
+              {@const canGroup = canGroupMessages(message, filteredMessages[index - 1])}
+              {#if selectedMessageId}
+                <ActivityMessagePresenter
+                  value={message}
+                  doc={object}
+                  hideLink={true}
+                  type={canGroup ? 'short' : 'default'}
+                  isHighlighted={selectedMessageId === message._id}
+                  withShowMore
+                />
+              {:else}
+                <Lazy>
+                  <ActivityMessagePresenter
+                    value={message}
+                    doc={object}
+                    hideLink={true}
+                    type={canGroup ? 'short' : 'default'}
+                    isHighlighted={selectedMessageId === message._id}
+                    withShowMore
+                  />
+                </Lazy>
+              {/if}
+            {/each}
+          </Grid>
+        {/if}
+      </div>
+      {#if showCommenInput && !isNewestFirst}
+        <div class="ref-input oldest-first">
+          <ActivityExtensionComponent
+            kind="input"
+            {extensions}
+            props={{ object, boundary, focusIndex, withTypingInfo: true }}
+          />
+        </div>
+      {/if}
+    </svelte:fragment>
+  </Section>
+</div>
+
+<style lang="scss">
+  .ref-input {
+    flex-shrink: 0;
+    &.newest-first {
+      margin-bottom: 1rem;
+      padding-top: 1rem;
+    }
+    &.oldest-first {
+      padding-bottom: 2.5rem;
+    }
+  }
+
+  .p-activity {
+    &.newest-first {
+      padding-bottom: 1.75rem;
+    }
+    &:not(.newest-first) {
+      margin: 1.75rem 0;
+    }
+  }
+
+  .invisible {
+    display: none;
+  }
+
+  :global(.grid .msgactivity-container.showIcon:last-child::after) {
+    content: none;
+  }
+</style>
