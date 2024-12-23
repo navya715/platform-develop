@@ -1,4 +1,5 @@
-// Copyright © 2023 Hardcore Engineering Inc.
+//
+// Copyright © 2022 Hardcore Engineering Inc.
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -10,21 +11,27 @@
 //
 // See the License for the specific language governing permissions and
 // limitations under the License.
+//
 
-import { type AnyComponent, type AnySvelteComponent } from '@hcengineering/ui'
-
-interface BreadcrumbsProps {
-  readonly color?: number | undefined
+/**
+ * @public
+ */
+export interface ReconiDocument {
+  format: string
+  firstName: string
+  lastName: string
+  title?: string
+  avatar?: string
+  avatarName?: string
+  avatarFormat?: string
+  email?: string
+  phone?: string
+  city?: string
+  skype?: string
+  linkedin?: string
+  github?: string
+  facebook?: string
+  telegram?: string
+  twitter?: string
+  skills: string[]
 }
-
-type TextBreadcrumbsProps = { title: string } & (
-  | { readonly href: string, readonly onClick?: undefined }
-  | { readonly href?: undefined, readonly onClick: (event: MouseEvent) => void }
-)
-
-export interface ComponentBreadcrumbsProps {
-  readonly component: AnyComponent | AnySvelteComponent
-  readonly props: Record<string, any>
-}
-
-export type BreadcrumbsModel = BreadcrumbsProps & (TextBreadcrumbsProps | ComponentBreadcrumbsProps)

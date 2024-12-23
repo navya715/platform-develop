@@ -1,23 +1,10 @@
 {
+  "extends": "./node_modules/@hcengineering/platform-rig/profiles/node/tsconfig.json",
+
   "compilerOptions": {
-    "moduleResolution": "node",
-    "target": "esnext",
-    "module": "esnext",
-    "declaration": true,
     "rootDir": "./src",
-    "outDir": "./.build/dist",
-    "strict": true,
-    "skipLibCheck": true,
-    "skipDefaultLibCheck": true,
-    "esModuleInterop": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "lib": [
-      "esnext",
-      "dom"
-    ],
-    "incremental": true,
-    "types": ["jest"],
-    "isolatedModules": true
+    "outDir": "./lib",
+    "declarationDir": "./types",
+    "tsBuildInfoFile": ".build/build.tsbuildinfo"
   }
 }

@@ -1,5 +1,5 @@
 //
-// Copyright © 2023 Hardcore Engineering Inc.
+// Copyright © 2024 Hardcore Engineering Inc.
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -13,173 +13,79 @@
 // limitations under the License.
 //
 
-import { mergeQueries } from '..'
+import { makeRank } from '..'
 
-describe('mergeQueries', () => {
-  it('merges query with empty query', () => {
-    const q1 = { name: 'john', age: { $gt: 42 } }
-    const q2 = {}
-    const res = { name: 'john', age: { $gt: 42 } }
-
-    expect(mergeQueries(q1, q2)).toEqual(res)
-    expect(mergeQueries(q2, q1)).toEqual(res)
+describe('makeRank', () => {
+  it('calculates rank when no prev and next', () => {
+    expect(makeRank(undefined, undefined)).toBe('0|hzzzzz:')
   })
 
-  it('merges query with different fields', () => {
-    const q1 = { name: 'john' }
-    const q2 = { age: { $gt: 42 } }
-    const res = { name: 'john', age: { $gt: 42 } }
-
-    expect(mergeQueries(q1, q2)).toEqual(res)
-    expect(mergeQueries(q2, q1)).toEqual(res)
+  it.each([
+    ['0|hzzzzz:', '0|i00007:'],
+    ['0|i00007:', '0|i0000f:'],
+    ['0|i0000f:', '0|i0000n:'],
+    ['0|zzzzzz:', '0|zzzzzz:']
+  ])('calculates rank value when prev is %p', (prev, expected) => {
+    expect(makeRank(prev, undefined)).toBe(expected)
   })
 
-  it('merges equal field values', () => {
-    expect(mergeQueries({ value: 42 }, { value: 42 })).toEqual({ value: 42 })
+  it.each([
+    ['0|hzzzzz:', '0|hzzzzr:'],
+    ['0|hzzzzr:', '0|hzzzzj:'],
+    ['0|hzzzzj:', '0|hzzzzb:'],
+    ['0|000000:', '0|000000:']
+  ])('calculates rank value when next is %p', (next, expected) => {
+    expect(makeRank(undefined, next)).toBe(expected)
   })
 
-  it('does not merge different field values', () => {
-    const q1 = { value: 42 }
-    const q2 = { value: 'true' }
-    const res = { value: { $in: [] } }
-    expect(mergeQueries(q1, q2)).toEqual(res)
-    expect(mergeQueries(q2, q1)).toEqual(res)
+  it.each([
+    ['0|000000:', '0|000001:', '0|000000:i'],
+    ['0|hzzzzz:', '0|i0000f:', '0|i00007:'],
+    ['0|hzzzzz:', '0|hzzzzz:', '0|i00007:'],
+    ['0|i00007:', '0|i00007:', '0|i0000f:'],
+    ['0|i00007:', '0|i00008:', '0|i00007:i']
+  ])('calculates rank value when prev is %p and next is %p', (prev, next, expected) => {
+    expect(makeRank(prev, next)).toBe(expected)
   })
 
-  it('merges predicate with predicate', () => {
-    expect(mergeQueries({ age: { $in: [41, 42] } }, { age: { $in: [42, 43] } })).toEqual({ age: { $in: [42] } })
-    expect(mergeQueries({ age: { $in: [42, 43] } }, { age: { $in: [41, 42] } })).toEqual({ age: { $in: [42] } })
-
-    expect(mergeQueries({ age: { $nin: [42] } }, { age: { $nin: [42] } })).toEqual({ age: { $nin: [42] } })
-
-    expect(mergeQueries({ age: { $lt: 45 } }, { age: { $lt: 42 } })).toEqual({ age: { $lt: 42 } })
-    expect(mergeQueries({ age: { $lt: 42 } }, { age: { $lt: 45 } })).toEqual({ age: { $lt: 42 } })
-
-    expect(mergeQueries({ age: { $gt: 40 } }, { age: { $gt: 42 } })).toEqual({ age: { $gt: 42 } })
-    expect(mergeQueries({ age: { $gt: 42 } }, { age: { $gt: 40 } })).toEqual({ age: { $gt: 42 } })
-
-    expect(mergeQueries({ age: { $lte: 45 } }, { age: { $lte: 42 } })).toEqual({ age: { $lte: 42 } })
-    expect(mergeQueries({ age: { $lte: 42 } }, { age: { $lte: 45 } })).toEqual({ age: { $lte: 42 } })
-
-    expect(mergeQueries({ age: { $gte: 40 } }, { age: { $gte: 42 } })).toEqual({ age: { $gte: 42 } })
-    expect(mergeQueries({ age: { $gte: 42 } }, { age: { $gte: 40 } })).toEqual({ age: { $gte: 42 } })
-
-    expect(mergeQueries({ age: { $ne: 42 } }, { age: { $ne: 42 } })).toEqual({ age: { $ne: 42 } })
+  it.each([
+    [10, '0|hzzzxr:'],
+    [100, '0|hzzzdr:'],
+    [1000, '0|hzzttr:'],
+    [10000, '0|hzya9r:']
+  ])('produces prev rank of reasonable length for %p generations', (count, expected) => {
+    let rank = '0|hzzzzz:'
+    for (let i = 0; i < count; i++) {
+      rank = makeRank(undefined, rank)
+    }
+    expect(rank).toBe(expected)
   })
 
-  it('merges predicate with value', () => {
-    // positive
-    expect(mergeQueries({ age: { $in: [41, 42, 43] } }, { age: 42 })).toEqual({ age: 42 })
-    expect(mergeQueries({ age: 42 }, { age: { $in: [41, 42, 43] } })).toEqual({ age: 42 })
-
-    expect(mergeQueries({ age: { $nin: [41, 43] } }, { age: 42 })).toEqual({ age: 42 })
-    expect(mergeQueries({ age: 42 }, { age: { $nin: [41, 43] } })).toEqual({ age: 42 })
-
-    expect(mergeQueries({ age: { $lt: 45 } }, { age: 42 })).toEqual({ age: 42 })
-    expect(mergeQueries({ age: 42 }, { age: { $lt: 45 } })).toEqual({ age: 42 })
-
-    expect(mergeQueries({ age: { $gt: 40 } }, { age: 42 })).toEqual({ age: 42 })
-    expect(mergeQueries({ age: 42 }, { age: { $gt: 40 } })).toEqual({ age: 42 })
-
-    expect(mergeQueries({ age: { $lte: 42 } }, { age: 42 })).toEqual({ age: 42 })
-    expect(mergeQueries({ age: 42 }, { age: { $lte: 42 } })).toEqual({ age: 42 })
-
-    expect(mergeQueries({ age: { $gte: 42 } }, { age: 42 })).toEqual({ age: 42 })
-    expect(mergeQueries({ age: 42 }, { age: { $gte: 42 } })).toEqual({ age: 42 })
-
-    expect(mergeQueries({ age: { $ne: 40 } }, { age: 42 })).toEqual({ age: 42 })
-    expect(mergeQueries({ age: 42 }, { age: { $ne: 40 } })).toEqual({ age: 42 })
-
-    // negative
-    expect(mergeQueries({ age: { $in: [31, 32, 33] } }, { age: 42 })).toEqual({ age: { $in: [] } })
-    expect(mergeQueries({ age: 42 }, { age: { $in: [31, 32, 33] } })).toEqual({ age: { $in: [] } })
-
-    expect(mergeQueries({ age: { $nin: [41, 42, 43] } }, { age: 42 })).toEqual({ age: { $in: [] } })
-    expect(mergeQueries({ age: 42 }, { age: { $nin: [41, 42, 43] } })).toEqual({ age: { $in: [] } })
-
-    expect(mergeQueries({ age: { $lt: 42 } }, { age: 42 })).toEqual({ age: { $in: [] } })
-    expect(mergeQueries({ age: 42 }, { age: { $lt: 42 } })).toEqual({ age: { $in: [] } })
-
-    expect(mergeQueries({ age: { $gt: 42 } }, { age: 42 })).toEqual({ age: { $in: [] } })
-    expect(mergeQueries({ age: 42 }, { age: { $gt: 42 } })).toEqual({ age: { $in: [] } })
-
-    expect(mergeQueries({ age: { $lte: 40 } }, { age: 42 })).toEqual({ age: { $in: [] } })
-    expect(mergeQueries({ age: 42 }, { age: { $lte: 40 } })).toEqual({ age: { $in: [] } })
-
-    expect(mergeQueries({ age: { $gte: 43 } }, { age: 42 })).toEqual({ age: { $in: [] } })
-    expect(mergeQueries({ age: 42 }, { age: { $gte: 43 } })).toEqual({ age: { $in: [] } })
-
-    expect(mergeQueries({ age: { $ne: 42 } }, { age: 42 })).toEqual({ age: { $in: [] } })
-    expect(mergeQueries({ age: 42 }, { age: { $ne: 42 } })).toEqual({ age: { $in: [] } })
+  it.each([
+    [5, '0|zfqzzz:'],
+    [10, '0|zzd7vh:'],
+    [50, '0|zzzzzy:zzzi'],
+    [100, '0|zzzzzy:zzzzzzzzzzzv']
+  ])('produces middle rank of reasonable length for %p generations', (count, expected) => {
+    let rank = '0|hzzzzz:'
+    for (let i = 0; i < count; i++) {
+      rank = makeRank(rank, '0|zzzzzz')
+    }
+    expect(rank).toBe(expected)
   })
 
-  it('$in merge', () => {
-    expect(mergeQueries({ value: { $in: [1, 2] } }, { value: { $in: [2, 3] } })).toEqual({ value: { $in: [2] } })
-    expect(mergeQueries({ value: { $in: [2, 3] } }, { value: { $in: [1, 2] } })).toEqual({ value: { $in: [2] } })
-
-    expect(mergeQueries({ value: { $in: [1, 2] } }, { value: { $in: [3, 4] } })).toEqual({ value: { $in: [] } })
-    expect(mergeQueries({ value: { $in: [3, 4] } }, { value: { $in: [1, 2] } })).toEqual({ value: { $in: [] } })
-
-    expect(mergeQueries({ value: { $in: [] } }, { value: { $in: [] } })).toEqual({ value: { $in: [] } })
-    expect(mergeQueries({ value: { $in: [42] } }, { value: { $in: [42] } })).toEqual({ value: { $in: [42] } })
-  })
-
-  it('$nin merge', () => {
-    expect(mergeQueries({ value: { $nin: [] } }, { value: { $nin: [] } })).toEqual({})
-    expect(mergeQueries({ value: { $nin: [42] } }, { value: { $nin: [42] } })).toEqual({ value: { $nin: [42] } })
-  })
-
-  it('$in $nin $ne merge', () => {
-    // $in and $nin
-    expect(mergeQueries({ value: { $in: [1, 2] } }, { value: { $nin: [1] } })).toEqual({ value: { $in: [2] } })
-    expect(mergeQueries({ value: { $nin: [1] } }, { value: { $in: [1, 2] } })).toEqual({ value: { $in: [2] } })
-
-    expect(mergeQueries({ value: { $in: ['a', 'b'] } }, { value: { $nin: ['a'] } })).toEqual({ value: { $in: ['b'] } })
-    expect(mergeQueries({ value: { $nin: ['a'] } }, { value: { $in: ['a', 'b'] } })).toEqual({ value: { $in: ['b'] } })
-
-    expect(mergeQueries({ value: { $in: [1, 2] } }, { value: { $nin: [1, 2, 3] } })).toEqual({ value: { $in: [] } })
-    expect(mergeQueries({ value: { $nin: [1, 2, 3] } }, { value: { $in: [1, 2] } })).toEqual({ value: { $in: [] } })
-
-    expect(mergeQueries({ value: { $in: [1, 2] } }, { value: { $nin: [1, 2] } })).toEqual({ value: { $in: [] } })
-
-    expect(mergeQueries({ value: { $in: [] } }, { value: { $nin: [42] } })).toEqual({ value: { $in: [] } })
-    expect(mergeQueries({ value: { $nin: [42] } }, { value: { $in: [] } })).toEqual({ value: { $in: [] } })
-
-    // $in and $ne
-    expect(mergeQueries({ value: { $in: [1, 2] } }, { value: { $ne: 1 } })).toEqual({ value: { $in: [2] } })
-    expect(mergeQueries({ value: { $ne: 1 } }, { value: { $in: [1, 2] } })).toEqual({ value: { $in: [2] } })
-
-    expect(mergeQueries({ value: { $in: [1] } }, { value: { $ne: 1 } })).toEqual({ value: { $in: [] } })
-    expect(mergeQueries({ value: { $ne: 1 } }, { value: { $in: [1] } })).toEqual({ value: { $in: [] } })
-
-    expect(mergeQueries({ value: { $in: [] } }, { value: { $ne: 42 } })).toEqual({ value: { $in: [] } })
-    expect(mergeQueries({ value: { $ne: 42 } }, { value: { $in: [] } })).toEqual({ value: { $in: [] } })
-  })
-
-  it('$lt and $gt', () => {
-    expect(mergeQueries({ age: { $lt: 25 } }, { age: { $gt: 20 } })).toEqual({ age: { $lt: 25, $gt: 20 } })
-    expect(mergeQueries({ age: { $gt: 20 } }, { age: { $lt: 25 } })).toEqual({ age: { $lt: 25, $gt: 20 } })
-
-    expect(mergeQueries({ age: { $lt: 20 } }, { age: { $gt: 25 } })).toEqual({ age: { $lt: 20, $gt: 25 } })
-    expect(mergeQueries({ age: { $gt: 25 } }, { age: { $lt: 20 } })).toEqual({ age: { $lt: 20, $gt: 25 } })
-  })
-
-  it('complex', () => {
-    const q1 = {
-      space: 1,
-      unique: 'item',
-      age: { $gt: 10 }
-    } as any
-    const q2 = {
-      space: { $in: [1, 2] },
-      age: 30
-    } as any
-    const res = {
-      space: 1,
-      unique: 'item',
-      age: 30
-    } as any
-    expect(mergeQueries(q1, q2)).toEqual(res)
-    expect(mergeQueries(q2, q1)).toEqual(res)
+  it.each([
+    [10, '0|i00027:'],
+    [100, '0|i000m7:'],
+    [1000, '0|i00667:'],
+    [10000, '0|i01pq7:'],
+    [100000, '0|i0h5a7:'],
+    [1000000, '0|i4rgu7:']
+  ])('produces next rank of reasonable length for %p generations', (count, expected) => {
+    let rank = '0|hzzzzz:'
+    for (let i = 0; i < count; i++) {
+      rank = makeRank(rank, undefined)
+    }
+    expect(rank).toBe(expected)
   })
 })

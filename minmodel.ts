@@ -13,13 +13,23 @@
 // limitations under the License.
 //
 
+import type {
+  Account,
+  Arr,
+  Class,
+  Data,
+  Doc,
+  Domain,
+  Mixin,
+  Obj,
+  Ref,
+  Space,
+  TxCreateDoc,
+  TxCUD
+} from '@hcengineering/core'
+import core, { AccountRole, AttachedDoc, ClassifierKind, DOMAIN_MODEL, DOMAIN_TX, TxFactory } from '@hcengineering/core'
 import type { IntlString, Plugin } from '@hcengineering/platform'
 import { plugin } from '@hcengineering/platform'
-import type { Arr, Class, Data, Doc, Interface, Mixin, Obj, Ref, Space } from '../classes'
-import { AttachedDoc, ClassifierKind, DOMAIN_MODEL } from '../classes'
-import core from '../component'
-import type { DocumentUpdate, TxCUD, TxCreateDoc, TxRemoveDoc, TxUpdateDoc } from '../tx'
-import { DOMAIN_TX, TxFactory } from '../tx'
 
 const txFactory = new TxFactory(core.account.System)
 
@@ -27,74 +37,70 @@ function createClass (_class: Ref<Class<Obj>>, attributes: Data<Class<Obj>>): Tx
   return txFactory.createTxCreateDoc(core.class.Class, core.space.Model, attributes, _class)
 }
 
-function createInterface (_interface: Ref<Interface<Doc>>, attributes: Data<Interface<Doc>>): TxCreateDoc<Doc> {
-  return txFactory.createTxCreateDoc(core.class.Interface, core.space.Model, attributes, _interface)
-}
-
-export function createDoc<T extends Doc> (_class: Ref<Class<T>>, attributes: Data<T>): TxCreateDoc<T> {
-  return txFactory.createTxCreateDoc(_class, core.space.Model, attributes)
-}
-
-export function updateDoc<T extends Doc> (
+/**
+ * @public
+ */
+export function createDoc<T extends Doc> (
   _class: Ref<Class<T>>,
-  space: Ref<Space>,
-  objectId: Ref<T>,
-  operations: DocumentUpdate<T>
-): TxUpdateDoc<Doc> {
-  return txFactory.createTxUpdateDoc(_class, space, objectId, operations)
+  attributes: Data<T>,
+  id?: Ref<T>,
+  modifiedBy?: Ref<Account>
+): TxCreateDoc<Doc> {
+  const result = txFactory.createTxCreateDoc(_class, core.space.Model, attributes, id)
+  if (modifiedBy !== undefined) {
+    result.modifiedBy = modifiedBy
+  }
+  return result
 }
 
-export function deleteDoc<T extends Doc> (_class: Ref<Class<T>>, space: Ref<Space>, objectId: Ref<T>): TxRemoveDoc<Doc> {
-  return txFactory.createTxRemoveDoc(_class, space, objectId)
-}
-
+/**
+ * @public
+ */
 export interface TestMixin extends Doc {
   arr: Arr<string>
 }
 
+/**
+ * @public
+ */
 export interface AttachedComment extends AttachedDoc {
   message: string
 }
 
-export interface WithState extends Doc {
-  state: number
-  number: number
-}
-export interface Task extends Doc, WithState {
-  name: string
+interface TestProject extends Space {
+  prjName: string
 }
 
-export interface TaskMixinTodos extends Task {
-  todos: number
+interface TestProjectMixin extends TestProject {
+  someField?: string
 }
 
-export interface TaskMixinTodo extends AttachedDoc {
-  text: string
-}
-
-export interface TaskCheckItem extends AttachedDoc, WithState {
-  name: string
-  complete: boolean
-}
-
+/**
+ * @public
+ */
 export const test = plugin('test' as Plugin, {
   mixin: {
     TestMixin: '' as Ref<Mixin<TestMixin>>,
-    TaskMixinTodos: '' as Ref<Mixin<TaskMixinTodos>>
+    TestProjectMixin: '' as Ref<Mixin<TestProjectMixin>>
   },
   class: {
-    Task: '' as Ref<Class<Task>>,
-    TaskCheckItem: '' as Ref<Class<TaskCheckItem>>,
     TestComment: '' as Ref<Class<AttachedComment>>,
-    TestMixinTodo: '' as Ref<Mixin<TaskMixinTodo>>
-  },
-  interface: {
-    WithState: '' as Ref<Interface<WithState>>,
-    DummyWithState: '' as Ref<Interface<WithState>>
+    ParticipantsHolder: '' as Ref<Class<ParticipantsHolder>>,
+    TestProject: '' as Ref<Class<TestProject>>
   }
 })
 
 /**
+ * @public
+ */
+export interface ParticipantsHolder extends Doc {
+  participants?: Ref<Doc>[]
+}
+
+const DOMAIN_TEST: Domain = 'test' as Domain
+
+/**
+ * @public
  * Generate minimal model for testing purposes.
  * @returns R
  */
@@ -106,13 +112,6 @@ export function genMinModel (): TxCUD<Doc>[] {
     createClass(core.class.Doc, { label: 'Doc' as IntlString, extends: core.class.Obj, kind: ClassifierKind.CLASS })
   )
   txes.push(
-    createClass(core.class.AttachedDoc, {
-      label: 'AttachedDoc' as IntlString,
-      extends: core.class.Doc,
-      kind: ClassifierKind.MIXIN
-    })
-  )
-  txes.push(
     createClass(core.class.Class, {
       label: 'Class' as IntlString,
       extends: core.class.Doc,
@@ -121,10 +120,18 @@ export function genMinModel (): TxCUD<Doc>[] {
     })
   )
   txes.push(
-    createClass(core.class.Interface, {
-      label: 'Interface' as IntlString,
+    createClass(core.class.Mixin, {
+      label: 'Mixin' as IntlString,
+      extends: core.class.Class,
+      kind: ClassifierKind.CLASS,
+      domain: DOMAIN_MODEL
+    })
+  )
+  txes.push(
+    createClass(core.class.AttachedDoc, {
+      label: 'AttachedDoc' as IntlString,
       extends: core.class.Doc,
-      kind: ClassifierKind.CLASS
+      kind: ClassifierKind.MIXIN
     })
   )
   txes.push(
@@ -141,14 +148,6 @@ export function genMinModel (): TxCUD<Doc>[] {
       extends: core.class.Doc,
       kind: ClassifierKind.CLASS,
       domain: DOMAIN_MODEL
-    })
-  )
-
-  txes.push(
-    createInterface(test.interface.WithState, {
-      label: 'WithState' as IntlString,
-      extends: [],
-      kind: ClassifierKind.INTERFACE
     })
   )
 
@@ -189,11 +188,10 @@ export function genMinModel (): TxCUD<Doc>[] {
       kind: ClassifierKind.CLASS
     })
   )
-
   txes.push(
-    createClass(core.class.Blob, {
-      label: 'Blob' as IntlString,
-      extends: core.class.Doc,
+    createClass(core.class.TxMixin, {
+      label: 'TxMixin' as IntlString,
+      extends: core.class.TxCUD,
       kind: ClassifierKind.CLASS
     })
   )
@@ -207,57 +205,50 @@ export function genMinModel (): TxCUD<Doc>[] {
   )
 
   txes.push(
-    createInterface(test.interface.DummyWithState, {
-      label: 'DummyWithState' as IntlString,
-      extends: [test.interface.WithState],
-      kind: ClassifierKind.INTERFACE
+    createClass(test.class.TestProject, {
+      label: 'TestProject' as IntlString,
+      extends: core.class.Space,
+      kind: ClassifierKind.CLASS,
+      domain: DOMAIN_TEST
     })
   )
+
+  txes.push(
+    createClass(test.mixin.TestProjectMixin, {
+      label: 'TestProjectMixin' as IntlString,
+      extends: test.class.TestProject,
+      kind: ClassifierKind.MIXIN
+    })
+  )
+
   txes.push(
     createClass(test.class.TestComment, {
       label: 'TestComment' as IntlString,
       extends: core.class.AttachedDoc,
-      kind: ClassifierKind.CLASS
+      kind: ClassifierKind.CLASS,
+      domain: DOMAIN_TEST
     })
   )
+
   txes.push(
-    createClass(test.class.Task, {
-      label: 'Task' as IntlString,
+    createClass(test.class.ParticipantsHolder, {
+      label: 'ParticipantsHolder' as IntlString,
       extends: core.class.Doc,
-      implements: [test.interface.DummyWithState],
-      kind: ClassifierKind.CLASS
-    })
-  )
-  txes.push(
-    createClass(test.class.TaskCheckItem, {
-      label: 'Task' as IntlString,
-      extends: core.class.AttachedDoc,
-      implements: [test.interface.WithState],
-      kind: ClassifierKind.CLASS
+      kind: ClassifierKind.CLASS,
+      domain: DOMAIN_TEST
     })
   )
 
+  const u1 = 'User1' as Ref<Account>
+  const u2 = 'User2' as Ref<Account>
   txes.push(
-    createClass(test.mixin.TaskMixinTodos, {
-      label: 'TaskMixinTodos' as IntlString,
-      extends: test.class.Task,
-      kind: ClassifierKind.MIXIN
-    })
-  )
-  txes.push(
-    createClass(test.class.TestMixinTodo, {
-      label: 'TestMixinTodo' as IntlString,
-      extends: core.class.AttachedDoc,
-      kind: ClassifierKind.CLASS
-    })
-  )
-
-  txes.push(
+    createDoc(core.class.Account, { email: 'user1@site.com', role: AccountRole.User }, u1),
+    createDoc(core.class.Account, { email: 'user2@site.com', role: AccountRole.User }, u2),
     createDoc(core.class.Space, {
       name: 'Sp1',
       description: '',
       private: false,
-      members: [],
+      members: [u1, u2],
       archived: false
     })
   )
@@ -267,7 +258,7 @@ export function genMinModel (): TxCUD<Doc>[] {
       name: 'Sp2',
       description: '',
       private: false,
-      members: [],
+      members: [u1],
       archived: false
     })
   )
