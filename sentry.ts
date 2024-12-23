@@ -1,49 +1,50 @@
-import { type AnalyticProvider } from "@hcengineering/analytics"
-import * as Sentry from "@sentry/svelte"
+import { AnalyticProvider } from '@hcengineering/analytics'
+import * as Sentry from '@sentry/node'
 
 export class SentryAnalyticProvider implements AnalyticProvider {
-  navigate (path: string): void {}
+  constructor (readonly SENTRY_DSN: string) {}
+
   init (config: Record<string, any>): boolean {
-    if (config.SENTRY_DSN !== undefined && config.SENTRY_DSN !== '') {
-      Sentry.init({
-        dsn: config.SENTRY_DSN,
-        integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration({
-          maskAllText: false,
-          blockAllMedia: false
-        })],
+    Sentry.init({
+      dsn: this.SENTRY_DSN,
+      integrations: (integrations) => {
+        // integrations will be all default integrations
+        return [
+          ...integrations.filter((integration) => integration.name !== 'Console'),
+          Sentry.onUncaughtExceptionIntegration(),
+          Sentry.onUnhandledRejectionIntegration()
+        ]
+      },
 
-        // Set tracesSampleRate to 1.0 to capture 100%
-        // of transactions for performance monitoring.
-        // We recommend adjusting this value in production
-        tracesSampleRate: 1.0,
-
-        tracePropagationTargets: [/^https:\/\/huly\.app/, /^https:\/\/app\.huly\.io/, /^https:\/\/account\.huly\.io/],
-
-        replaysSessionSampleRate: 0.0,
-        replaysOnErrorSampleRate: 1.0,
-      })
-      return true
-    }
-    return false
+      // Set tracesSampleRate to 1.0 to capture 100%
+      // of transactions for performance monitoring.
+      // We recommend adjusting this value in production
+      tracesSampleRate: 1.0
+    })
+    return true
   }
 
-  setUser(email: string): void {
+  setUser (email: string): void {
     Sentry.setUser({ email })
   }
-  logout(): void {
-    Sentry.setUser(null)
-  }
-  setTag(key: string, value: string): void {
+
+  setTag (key: string, value: string): void {
     Sentry.setTag(key, value)
   }
-  setWorkspace(ws: string): void {
+
+  setWorkspace (ws: string): void {
     this.setTag('workspace', ws)
   }
-  handleEvent(event: string): void {
+
+  handleEvent (event: string): void {
     // currently we don't need it, but maybe in future
     // Sentry.captureMessage(event, 'log')
   }
-  handleError(error: Error): void {
+
+  handleError (error: Error): void {
     Sentry.captureException(error)
   }
+
+  navigate (path: string): void {}
+  logout (): void {}
 }

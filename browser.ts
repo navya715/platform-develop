@@ -13,20 +13,10 @@
 // limitations under the License.
 //
 
-import { concatLink } from '@hcengineering/core'
+import { type ClientSocket, type ClientSocketFactory } from '@hcengineering/client'
 
-export interface ServerConfig {
-  ACCOUNTS_URL: string
-  COLLABORATOR_URL: string
-  FILES_URL: string
-  UPLOAD_URL: string
-}
-
-export async function loadServerConfig (url: string): Promise<ServerConfig> {
-  const configUrl = concatLink(url, '/config.json')
-  const res = await fetch(configUrl)
-  if (res.ok) {
-    return (await res.json()) as ServerConfig
-  }
-  throw new Error('Failed to fetch config')
+/** @public */
+export const BrowserWebSocketFactory: ClientSocketFactory = (url: string): ClientSocket => {
+  const ws = new WebSocket(url)
+  return ws as ClientSocket
 }
