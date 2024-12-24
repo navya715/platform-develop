@@ -1,5 +1,5 @@
 //
-// Copyright © 2020 Anticrm Platform Contributors.
+// Copyright © 2024 Hardcore Engineering Inc.
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -12,36 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-
-import { addStringsLoader, loadMetadata } from '@hcengineering/platform'
-import contact, { contactId } from '@hcengineering/contact'
+import documents from '@hcengineering/controlled-documents'
+import { loadMetadata } from '@hcengineering/platform'
 
 const icons = require('../assets/icons.svg') as string // eslint-disable-line
-loadMetadata(contact.icon, {
-  ContactApplication: `${icons}#contactapplication`,
-  Phone: `${icons}#phone`,
-  Email: `${icons}#email`,
-  Discord: `${icons}#discord`,
-  Facebook: `${icons}#facebook`,
-  Instagram: `${icons}#instagram`,
-  LinkedIn: `${icons}#linkedin`,
-  Telegram: `${icons}#telegram`,
-  Twitter: `${icons}#twitter`,
-  VK: `${icons}#vk`,
-  WhatsApp: `${icons}#whatsapp`,
-  Skype: `${icons}#skype`,
-  Youtube: `${icons}#youtube`,
-  GitHub: `${icons}#github`,
-  Edit: `${icons}#edit`,
-  Person: `${icons}#person`,
-  Persona: `${icons}#persona`,
-  Company: `${icons}#company`,
-  SocialEdit: `${icons}#social-edit`,
-  Homepage: `${icons}#homepage`,
-  Whatsapp: `${icons}#whatsapp`,
-  Profile: `${icons}#profile`,
-  KickUser: `${icons}#kickUser`,
-  ComponentMembers: `${icons}#componentMembers`,
-  Contacts: `${icons}#contacts`
+loadMetadata(documents.icon, {
+  CheckmarkCircle: `${icons}#checkmark-circle`,
+  Approvals: `${icons}#approvals`,
+  DocumentApplication: `${icons}#documentapplication`,
+  NewDocument: `${icons}#newdocument`,
+  Document: `${icons}#document`,
+  Library: `${icons}#library`,
+  StateApproved: `${icons}#state-approved`,
+  StateDraft: `${icons}#state-draft`,
+  StateEffective: `${icons}#state-effective`,
+  StateRejected: `${icons}#state-rejected`,
+  StateObsolete: `${icons}#state-obsolete`,
+  ArrowUp: `${icons}#arrow-up`,
+  ArrowDown: `${icons}#arrow-down`,
+  Configure: `${icons}#configure`
 })
-addStringsLoader(contactId, async (lang: string) => await import(`../lang/${lang}.json`))

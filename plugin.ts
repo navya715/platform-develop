@@ -1,114 +1,301 @@
-//
-// Copyright © 2020 Anticrm Platform Contributors.
-//
-// Licensed under the Eclipse Public License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License. You may
-// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//
-// See the License for the specific language governing permissions and
-// limitations under the License.
-//
+import {
+  type Class,
+  type Doc,
+  type Mixin,
+  type Ref,
+  type Type,
+  type Space,
+  type SpaceTypeDescriptor,
+  type Permission
+} from '@hcengineering/core'
+import type { Asset, Plugin, Resource } from '@hcengineering/platform'
+import { IntlString, plugin } from '@hcengineering/platform'
+import type { AnyComponent, ResolvedLocation, Location } from '@hcengineering/ui'
+import { Action } from '@hcengineering/view'
 
-import chunter, { chunterId } from '@hcengineering/chunter'
-import type { Client, Doc, Ref, Space } from '@hcengineering/core'
-import type { IntlString, Resource } from '@hcengineering/platform'
-import { mergeIds } from '@hcengineering/platform'
-import type { AnyComponent } from '@hcengineering/ui'
-import { type ViewAction } from '@hcengineering/view'
-import { type DocNotifyContext, type InboxNotification } from '@hcengineering/notification'
+import type {
+  ChangeControl,
+  ControlledDocument,
+  ControlledDocumentState,
+  Document,
+  DocumentSnapshot,
+  DocumentApprovalRequest,
+  DocumentCategory,
+  DocumentComment,
+  DocumentMeta,
+  DocumentRequest,
+  DocumentReviewRequest,
+  DocumentSpace,
+  DocumentSpaceType,
+  DocumentSpaceTypeDescriptor,
+  DocumentState,
+  DocumentTemplate,
+  DocumentTraining,
+  HierarchyDocument,
+  ExternalSpace,
+  OrgSpace,
+  Project,
+  ProjectMeta,
+  ProjectDocument,
+  Sequence,
+  ControlledDocumentSnapshot
+} from './types'
 
-export default mergeIds(chunterId, chunter, {
+/**
+ * @public
+ */
+export const documentsId = 'documents' as Plugin
+
+/**
+ * @public
+ */
+export const documentsPlugin = plugin(documentsId, {
+  class: {
+    DocumentSpace: '' as Ref<Class<DocumentSpace>>,
+    DocumentSpaceType: '' as Ref<Class<DocumentSpaceType>>,
+    DocumentSpaceTypeDescriptor: '' as Ref<Class<DocumentSpaceTypeDescriptor>>,
+    ExternalSpace: '' as Ref<Class<ExternalSpace>>,
+    OrgSpace: '' as Ref<Class<OrgSpace>>,
+    Project: '' as Ref<Class<Project>>,
+    ProjectMeta: '' as Ref<Class<ProjectMeta>>,
+    ProjectDocument: '' as Ref<Class<ProjectDocument>>,
+    DocumentMeta: '' as Ref<Class<DocumentMeta>>,
+    Document: '' as Ref<Class<Document>>,
+    DocumentSnapshot: '' as Ref<Class<DocumentSnapshot>>,
+    ControlledDocumentSnapshot: '' as Ref<Class<ControlledDocumentSnapshot>>,
+    HierarchyDocument: '' as Ref<Class<HierarchyDocument>>,
+    DocumentCategory: '' as Ref<Class<DocumentCategory>>,
+    ControlledDocument: '' as Ref<Class<ControlledDocument>>,
+    ChangeControl: '' as Ref<Class<ChangeControl>>,
+    DocumentComment: '' as Ref<Class<DocumentComment>>,
+
+    Sequence: '' as Ref<Class<Sequence>>,
+
+    DocumentRequest: '' as Ref<Class<DocumentRequest>>,
+    DocumentReviewRequest: '' as Ref<Class<DocumentReviewRequest>>,
+    DocumentApprovalRequest: '' as Ref<Class<DocumentApprovalRequest>>,
+
+    TypeDocumentState: '' as Ref<Class<Type<DocumentState>>>,
+    TypeControlledDocumentState: '' as Ref<Class<Type<ControlledDocumentState>>>
+  },
+  mixin: {
+    DocumentTemplate: '' as Ref<Mixin<DocumentTemplate>>,
+    DocumentTraining: '' as Ref<Mixin<DocumentTraining>>,
+    DocumentSpaceTypeData: '' as Ref<Mixin<DocumentSpace>>
+    // DocTemplateActions: '' as Ref<Mixin<DocTemplateActions>>
+  },
   component: {
-    CreateChannel: '' as AnyComponent,
-    CreateDirectChat: '' as AnyComponent,
-    ChannelHeader: '' as AnyComponent,
-    ChannelPanel: '' as AnyComponent,
-    ThreadViewPanel: '' as AnyComponent,
-    ThreadParentPresenter: '' as AnyComponent,
-    EditChannel: '' as AnyComponent,
-    ChannelPreview: '' as AnyComponent,
-    MessagePreview: '' as AnyComponent,
-    CreateDocChannel: '' as AnyComponent,
-    SavedMessages: '' as AnyComponent,
-    Threads: '' as AnyComponent,
-    ChunterBrowser: '' as AnyComponent,
-    ChannelIcon: '' as AnyComponent
+    Documents: '' as AnyComponent,
+    DocumentsContainer: '' as AnyComponent,
+    CreateDocument: '' as AnyComponent,
+    EditDocOwner: '' as AnyComponent,
+    QmsDocumentWizard: '' as AnyComponent,
+    QmsTemplateWizard: '' as AnyComponent,
+    EditDoc: '' as AnyComponent,
+    EditProjectDoc: '' as AnyComponent,
+    EditDocTemplate: '' as AnyComponent,
+    DocumentPresenter: '' as AnyComponent,
+    StatePresenter: '' as AnyComponent,
+    TitlePresenter: '' as AnyComponent,
+    ModificationDatePresenter: '' as AnyComponent,
+    OwnerPresenter: '' as AnyComponent,
+    AddCommentPopup: '' as AnyComponent,
+    DocumentCommentsPopup: '' as AnyComponent,
+    ChangeOwnerPopup: '' as AnyComponent,
+    DocumentMetaPresenter: '' as AnyComponent,
+    DocumentVersionPresenter: '' as AnyComponent,
+    DeleteCategoryPopup: '' as AnyComponent,
+    DocumentIcon: '' as AnyComponent
+  },
+  action: {
+    ChangeDocumentOwner: '' as Ref<Action<Doc, any>>,
+    CreateChildDocument: '' as Ref<Action<Document, any>>,
+    CreateChildTemplate: '' as Ref<Action<Document, any>>,
+    CreateDocument: '' as Ref<Action<DocumentSpace, any>>,
+    CreateTemplate: '' as Ref<Action<DocumentSpace, any>>,
+    DeleteDocumentCategory: '' as Ref<Action<Doc, any>>,
+    DeleteDocument: '' as Ref<Action>,
+    ArchiveDocument: '' as Ref<Action>,
+    EditDocSpace: '' as Ref<Action>,
+    Print: '' as Ref<Action<Doc, { signed: boolean }>>
   },
   function: {
-    GetDmName: '' as Resource<(client: Client, space: Space) => Promise<string>>,
-    DirectTitleProvider: '' as Resource<(client: Client, id: Ref<Doc>) => Promise<string>>,
-    ChannelTitleProvider: '' as Resource<(client: Client, id: Ref<Doc>) => Promise<string>>,
-    ChunterBrowserVisible: '' as Resource<(spaces: Space[]) => Promise<boolean>>,
-    GetUnreadThreadsCount: '' as Resource<
-    (inboxNotificationsByContext: Map<Ref<DocNotifyContext>, InboxNotification[]>) => number
-    >
+    CanChangeDocumentOwner: '' as Resource<(doc?: Doc | Doc[]) => Promise<boolean>>,
+    CanDeleteDocumentCategory: '' as Resource<(doc?: Doc | Doc[]) => Promise<boolean>>
   },
-  actionImpl: {
-    SubscribeMessage: '' as ViewAction,
-    UnsubscribeMessage: '' as ViewAction,
-    SubscribeComment: '' as ViewAction,
-    UnsubscribeComment: '' as ViewAction,
-    LeaveChannel: '' as ViewAction,
-    RemoveChannel: '' as ViewAction
+  icon: {
+    Approvals: '' as Asset,
+    CheckmarkCircle: '' as Asset,
+    DocumentApplication: '' as Asset,
+    NewDocument: '' as Asset,
+    Document: '' as Asset,
+    Library: '' as Asset,
+    StateDraft: '' as Asset,
+    StateApproved: '' as Asset,
+    StateEffective: '' as Asset,
+    StateRejected: '' as Asset,
+    StateObsolete: '' as Asset,
+    ArrowUp: '' as Asset,
+    ArrowDown: '' as Asset,
+    Configure: '' as Asset
+  },
+  space: {
+    Documents: '' as Ref<Space>,
+    QualityDocuments: '' as Ref<OrgSpace>,
+    UnsortedTemplates: '' as Ref<DocumentSpace>
+  },
+  spaceType: {
+    DocumentSpaceType: '' as Ref<DocumentSpaceType>
+  },
+  app: {
+    Documents: '' as Ref<Doc>
   },
   string: {
-    Channel: '' as IntlString,
-    DirectMessage: '' as IntlString,
-    DirectMessages: '' as IntlString,
-    CreateChannel: '' as IntlString,
-    NewDirectMessage: '' as IntlString,
-    ChannelName: '' as IntlString,
-    ChannelNamePlaceholder: '' as IntlString,
-    ChannelDescription: '' as IntlString,
-    About: '' as IntlString,
-    Members: '' as IntlString,
-    NoMembers: '' as IntlString,
-    In: '' as IntlString,
-    Replies: '' as IntlString,
-    Topic: '' as IntlString,
-    Threads: '' as IntlString,
-    New: '' as IntlString,
-    GetNewReplies: '' as IntlString,
-    TurnOffReplies: '' as IntlString,
-    PinMessage: '' as IntlString,
-    UnpinMessage: '' as IntlString,
-    Pinned: '' as IntlString,
-    DeleteMessage: '' as IntlString,
-    EditMessage: '' as IntlString,
-    Edited: '' as IntlString,
-    AndYou: '' as IntlString,
-    ShowMoreReplies: '' as IntlString,
-    AddToSaved: '' as IntlString,
-    RemoveFromSaved: '' as IntlString,
-    EmptySavedHeader: '' as IntlString,
-    EmptySavedText: '' as IntlString,
-    SharedBy: '' as IntlString,
-    LeaveChannel: '' as IntlString,
-    ChannelBrowser: '' as IntlString,
-    Saved: '' as IntlString,
-    MessagesBrowser: '' as IntlString,
-    ChunterBrowser: '' as IntlString,
-    Messages: '' as IntlString,
-    NoResults: '' as IntlString,
-    CopyLink: '' as IntlString,
-    You: '' as IntlString,
-    YouHaveJoinedTheConversation: '' as IntlString,
-    NoMessages: '' as IntlString,
-    On: '' as IntlString,
-    Mentioned: '' as IntlString,
-    SentMessage: '' as IntlString,
-    PinnedCount: '' as IntlString,
-    LoadingHistory: '' as IntlString,
-    UnpinChannels: '' as IntlString,
-    ArchiveActivityConfirmationTitle: '' as IntlString,
-    ArchiveActivityConfirmationMessage: '' as IntlString,
-    JoinChannelHeader: '' as IntlString,
-    JoinChannelText: '' as IntlString,
-    LatestMessages: '' as IntlString,
-    ResolveThread: '' as IntlString
+    Document: '' as IntlString,
+    Documents: '' as IntlString,
+    DocumentTemplate: '' as IntlString,
+    Title: '' as IntlString,
+    Code: '' as IntlString,
+    Number: '' as IntlString,
+    Version: '' as IntlString,
+    Category: '' as IntlString,
+    Author: '' as IntlString,
+    Owner: '' as IntlString,
+    Status: '' as IntlString,
+    Labels: '' as IntlString,
+    Description: '' as IntlString,
+    Reason: '' as IntlString,
+    CollaborativeDocument: '' as IntlString,
+    ControlledDocument: '' as IntlString,
+    Review: '' as IntlString,
+    Approval: '' as IntlString,
+    Reviewers: '' as IntlString,
+    Approvers: '' as IntlString,
+    CoAuthors: '' as IntlString,
+    ReviewInterval: '' as IntlString,
+    EffectiveDate: '' as IntlString,
+    PlannedEffectiveDate: '' as IntlString,
+    ChangeControl: '' as IntlString,
+    Rank: '' as IntlString,
+    DocumentRequest: '' as IntlString,
+    DocumentReviewRequest: '' as IntlString,
+    DocumentApprovalRequest: '' as IntlString,
+    ControlledStatus: '' as IntlString,
+    Categories: '' as IntlString,
+    Guidance: '' as IntlString,
+    Required: '' as IntlString,
+    Major: '' as IntlString,
+    Minor: '' as IntlString,
+    Patch: '' as IntlString,
+    AttachmentsMax: '' as IntlString,
+    Draft: '' as IntlString,
+    Deleted: '' as IntlString,
+    Effective: '' as IntlString,
+    Archived: '' as IntlString,
+    Parent: '' as IntlString,
+    Template: '' as IntlString,
+    GeneralInfo: '' as IntlString,
+    InProgress: '' as IntlString,
+    Resolve: '' as IntlString,
+    Unresolve: '' as IntlString,
+    Pending: '' as IntlString,
+    Resolved: '' as IntlString,
+    ShowResolved: '' as IntlString,
+    Ordering: '' as IntlString,
+    SelectOwner: '' as IntlString,
+    ChangeOwner: '' as IntlString,
+    ChangeOwnerHintBeginning: '' as IntlString,
+    ChangeOwnerHintEnd: '' as IntlString,
+    ChangeOwnerWarning: '' as IntlString,
+    CreateDocument: '' as IntlString,
+    CreateTemplate: '' as IntlString,
+    DeleteCategory: '' as IntlString,
+    DeleteCategoryHint: '' as IntlString,
+    DeleteCategoryWarning: '' as IntlString,
+    Key: '' as IntlString,
+    CommentsSequence: '' as IntlString,
+    Index: '' as IntlString,
+    GeneralDocumentation: '' as IntlString,
+    TechnicalDocumentation: '' as IntlString,
+    UnsortedTemplates: '' as IntlString,
+    Project: '' as IntlString,
+    Projects: '' as IntlString,
+    ExternalSpace: '' as IntlString,
+    DocumentSpaceType: '' as IntlString,
+    Path: '' as IntlString,
+    CreateChildDocument: '' as IntlString,
+    CreateChildTemplate: '' as IntlString,
+    All: '' as IntlString,
+    ImpactAnalysis: '' as IntlString,
+    ImpactedDocuments: '' as IntlString,
+    SysTemplate: '' as IntlString,
+    DocumentTrainingDueDays: '' as IntlString,
+    DocumentTrainingEnabled: '' as IntlString,
+    Own: '' as IntlString,
+    Snapshot: '' as IntlString,
+    Snapshots: '' as IntlString,
+    ControlledSnapshot: '' as IntlString,
+    DraftRevision: '' as IntlString,
+    CreateNewDraft: '' as IntlString,
+    CreateOrgSpace: '' as IntlString,
+
+    ReviewDocumentPermission: '' as IntlString,
+    ReviewDocumentDescription: '' as IntlString,
+    ApproveDocumentPermission: '' as IntlString,
+    ApproveDocumentDescription: '' as IntlString,
+    ArchiveDocumentPermission: '' as IntlString,
+    ArchiveDocumentDescription: '' as IntlString,
+    CoAuthorDocumentPermission: '' as IntlString,
+    CoAuthorDocumentDescription: '' as IntlString,
+    CreateDocumentPermission: '' as IntlString,
+    CreateDocumentDescription: '' as IntlString,
+    UpdateDocumentOwnerPermission: '' as IntlString,
+    UpdateDocumentOwnerDescription: '' as IntlString,
+    CreateDocumentCategoryPermission: '' as IntlString,
+    CreateDocumentCategoryDescription: '' as IntlString,
+    UpdateDocumentCategoryPermission: '' as IntlString,
+    UpdateDocumentCategoryDescription: '' as IntlString,
+    DeleteDocumentCategoryPermission: '' as IntlString,
+    DeleteDocumentCategoryDescription: '' as IntlString,
+    ConfigLabel: '' as IntlString,
+    ConfigDescription: '' as IntlString
+  },
+  ids: {
+    NoParent: '' as Ref<DocumentMeta>,
+    NoProject: '' as Ref<Project>
+  },
+  sequence: {
+    Templates: '' as Ref<Sequence>,
+    CcTemplates: '' as Ref<Sequence>,
+    EccTemplates: '' as Ref<Sequence>
+  },
+  category: {
+    DOC: '' as Ref<DocumentCategory>,
+    VE: '' as Ref<DocumentCategory>,
+    CM: '' as Ref<DocumentCategory>,
+    CA: '' as Ref<DocumentCategory>,
+    CC: '' as Ref<DocumentCategory>
+  },
+  resolver: {
+    Location: '' as Resource<(loc: Location) => Promise<ResolvedLocation | undefined>>
+  },
+  descriptor: {
+    DocumentSpaceType: '' as Ref<SpaceTypeDescriptor>
+  },
+  permission: {
+    ReviewDocument: '' as Ref<Permission>,
+    ApproveDocument: '' as Ref<Permission>,
+    ArchiveDocument: '' as Ref<Permission>,
+    CoAuthorDocument: '' as Ref<Permission>,
+    CreateDocument: '' as Ref<Permission>,
+    UpdateDocumentOwner: '' as Ref<Permission>,
+    CreateDocumentCategory: '' as Ref<Permission>,
+    UpdateDocumentCategory: '' as Ref<Permission>,
+    DeleteDocumentCategory: '' as Ref<Permission>
+  },
+  template: {
+    ProductChangeControl: '' as Ref<DocumentTemplate>
   }
 })
+
+export default documentsPlugin
