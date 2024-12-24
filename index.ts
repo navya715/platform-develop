@@ -1,6 +1,5 @@
 //
-// Copyright © 2020, 2021 Anticrm Platform Contributors.
-// Copyright © 2021 Hardcore Engineering Inc.
+// Copyright © 2020 Anticrm Platform Contributors.
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -14,11 +13,28 @@
 // limitations under the License.
 //
 
-import board from '@hcengineering/board'
+import calendar from '@hcengineering/calendar'
 import { loadMetadata } from '@hcengineering/platform'
 
 const icons = require('../assets/icons.svg') as string // eslint-disable-line
-loadMetadata(board.icon, {
-  Board: `${icons}#board`,
-  Card: `${icons}#card`
+loadMetadata(calendar.icon, {
+  Calendar: `${icons}#calendar`,
+  CalendarView: `${icons}#calendarView`,
+  Reminder: `${icons}#reminder`,
+  Notifications: `${icons}#notifications`,
+  Location: `${icons}#location`,
+  Watch: `${icons}#watch`,
+  Description: `${icons}#description`,
+  Participants: `${icons}#participants`,
+  Repeat: `${icons}#repeat`,
+  Globe: `${icons}#globe`,
+  Private: `${icons}#private`,
+  Public: `${icons}#public`,
+  Hidden: `${icons}#eyeCrossed`
+})
+
+const permission = require('../assets/permission.png') as string // eslint-disable-line
+
+loadMetadata(calendar.image, {
+  Permissions: permission
 })
