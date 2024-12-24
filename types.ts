@@ -12,9 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-import { type IntlString } from '@hcengineering/platform'
 
-export interface MessageInlineAction {
-  label: IntlString
-  onClick?: () => Promise<void>
+import { Channel } from '@hcengineering/chunter'
+
+export enum AnalyticEventType {
+  SetUser = 'setUser',
+  SetTag = 'setTag',
+  Navigation = 'navigation',
+  Error = 'error',
+  CustomEvent = 'customEvent'
+}
+
+export interface AnalyticEvent {
+  event: AnalyticEventType
+  params: Record<string, any>
+  timestamp: number
+}
+
+export interface OnboardingChannel extends Channel {
+  workspaceId: string
+  workspaceName: string
+  workspaceUrl: string
+  email: string
+  userName: string
+  disableAIReplies: boolean
+  showAIReplies: boolean
 }

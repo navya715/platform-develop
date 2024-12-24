@@ -1,5 +1,5 @@
-//
-// Copyright © 2024 Anticrm Platform Contributors.
+<!--
+// Copyright © 2023 Hardcore Engineering Inc.
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -11,9 +11,13 @@
 //
 // See the License for the specific language governing permissions and
 // limitations under the License.
-//
+-->
+<script lang="ts">
+  import type { Attachment } from '@hcengineering/attachment'
 
-import { mergeIds } from '@hcengineering/platform'
-import aiBot, { aiBotId } from '@hcengineering/ai-bot'
+  export let value: Attachment | undefined
+</script>
 
-export default mergeIds(aiBotId, aiBot, {})
+{#if value}
+  {value.name}
+{/if}
