@@ -1,12 +1,8 @@
 <script lang="ts">
   export let size: 'small' | 'medium' | 'large'
-  export let fill: string = 'currentColor'
 </script>
 
-<svg class="svg-{size}" viewBox="0 0 16 16" {fill} xmlns="http://www.w3.org/2000/svg">
-  <path
-    fill-rule="evenodd"
-    clip-rule="evenodd"
-    d="M14.8536 3.14645C15.0488 3.34171 15.0488 3.65829 14.8536 3.85355L6.85355 11.8536C6.65829 12.0488 6.34171 12.0488 6.14645 11.8536L2.14645 7.85355C1.95118 7.65829 1.95118 7.34171 2.14645 7.14645C2.34171 6.95118 2.65829 6.95118 2.85355 7.14645L6.5 10.7929L14.1464 3.14645C14.3417 2.95118 14.6583 2.95118 14.8536 3.14645Z"
-  />
+<svg class="svg-{size}" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+  <path fill={'#27B166'} d="M10.1,1C5.2,0.9,1.1,4.9,1,9.8V10c0,5,4,9,9,9c4.9,0,9-4,9-8.9C19,5.1,15.1,1.1,10.1,1z" />
+  <polygon fill={'#FCFCFC'} points="8.5,14.3 5.4,11.1 6.6,9.9 8.5,11.7 13.9,6.4 15.1,7.6 " />
 </svg>
