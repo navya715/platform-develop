@@ -1,5 +1,5 @@
 //
-// Copyright © 2024 Anticrm Platform Contributors.
+// Copyright © 2022 Hardcore Engineering Inc.
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -13,7 +13,35 @@
 // limitations under the License.
 //
 
-import { mergeIds } from '@hcengineering/platform'
-import aiBot, { aiBotId } from '@hcengineering/ai-bot'
+import { type IntlString, mergeIds } from '@hcengineering/platform'
 
-export default mergeIds(aiBotId, aiBot, {})
+import bitrix, { bitrixId } from '@hcengineering/bitrix'
+import { type Ref } from '@hcengineering/core'
+import { type Handler, type IntegrationType } from '@hcengineering/setting'
+import { type AnyComponent } from '@hcengineering/ui'
+
+export default mergeIds(bitrixId, bitrix, {
+  string: {
+    BitrixTokenUrl: '' as IntlString,
+    Bitrix: '' as IntlString,
+    BitrixDesc: '' as IntlString,
+    Settings: '' as IntlString,
+    EntityMapping: '' as IntlString,
+    NotAllowed: '' as IntlString,
+    AddMapping: '' as IntlString,
+    BitrixEntityType: '' as IntlString,
+    FieldMapping: '' as IntlString,
+    AddField: '' as IntlString,
+    Attribute: '' as IntlString,
+    MapField: '' as IntlString
+  },
+  component: {
+    BitrixIcon: '' as AnyComponent
+  },
+  handler: {
+    DisconnectHandler: '' as Handler
+  },
+  integrationType: {
+    Bitrix: '' as Ref<IntegrationType>
+  }
+})

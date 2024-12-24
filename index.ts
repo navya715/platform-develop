@@ -1,5 +1,5 @@
 //
-// Copyright © 2020 Anticrm Platform Contributors.
+// Copyright © 2022 Hardcore Engineering Inc.
 //
 // Licensed under the Eclipse Public License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License. You may
@@ -13,11 +13,21 @@
 // limitations under the License.
 //
 
-import attachment from '@hcengineering/attachment'
-import { loadMetadata } from '@hcengineering/platform'
+import { type Resources } from '@hcengineering/platform'
 
-const icons = require('../assets/icons.svg') as string // eslint-disable-line
-loadMetadata(attachment.icon, {
-  Attachment: `${icons}#attachment`,
-  FileBrowser: `${icons}#fileBrowser`
+import BitrixConnect from './components/BitrixConnect.svelte'
+import BitrixConfigure from './components/BitrixConfigure.svelte'
+import BitrixIcon from './components/icons/Bitrix.svelte'
+import BitrixImport from './components/BitrixImport.svelte'
+
+export default async (): Promise<Resources> => ({
+  component: {
+    BitrixIcon,
+    BitrixConnect,
+    BitrixConfigure,
+    BitrixImport
+  },
+  handler: {
+    DisconnectHandler: async () => {}
+  }
 })
