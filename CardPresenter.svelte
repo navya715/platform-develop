@@ -1,4 +1,4 @@
-//
+<!--
 // Copyright © 2020, 2021 Anticrm Platform Contributors.
 // Copyright © 2021 Hardcore Engineering Inc.
 //
@@ -12,13 +12,28 @@
 //
 // See the License for the specific language governing permissions and
 // limitations under the License.
-//
+-->
+<script lang="ts">
+  import type { Card } from '@hcengineering/board'
+  import { getPanelURI, Icon } from '@hcengineering/ui'
+  import view from '@hcengineering/view'
+  import board from '../plugin'
 
-import board from '@hcengineering/board'
-import { loadMetadata } from '@hcengineering/platform'
+  export let value: Card
+  export let inline: boolean = false
+</script>
 
-const icons = require('../assets/icons.svg') as string // eslint-disable-line
-loadMetadata(board.icon, {
-  Board: `${icons}#board`,
-  Card: `${icons}#card`
-})
+{#if value}
+  <a
+    class="flex-presenter"
+    class:inline-presenter={inline}
+    href="#{getPanelURI(view.component.EditDoc, value._id, value._class, 'content')}"
+  >
+    {#if !inline}
+      <div class="icon">
+        <Icon icon={board.icon.Card} size={'small'} />
+      </div>
+    {/if}
+    <span class="label">{value.title}</span>
+  </a>
+{/if}
