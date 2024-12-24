@@ -12,43 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-import { type Asset, type IntlString } from '@hcengineering/platform'
-import { type Account, type Class, type Doc, type IdMap, type Ref, type UserStatus } from '@hcengineering/core'
-import { type DocNotifyContext } from '@hcengineering/notification'
-import { type AnySvelteComponent, type IconSize, type Action } from '@hcengineering/ui'
-import { type PersonAccount } from '@hcengineering/contact'
 
-export type ChatGroup = 'activity' | 'direct' | 'channels' | 'starred'
+import { ColorDefinition } from '@hcengineering/ui'
 
-export interface SortFnOptions {
-  contexts: DocNotifyContext[]
-  userStatusByAccount: Map<Ref<Account>, UserStatus>
-  personAccountById: IdMap<PersonAccount>
-}
+/**
+ * @public
+ */
+export type GravatarPlaceholderType =
+  | '404'
+  | 'mp'
+  | 'identicon'
+  | 'monsterid'
+  | 'wavatar'
+  | 'retro'
+  | 'robohash'
+  | 'blank'
 
-export interface ChatNavGroupModel {
-  id: ChatGroup
-  label?: IntlString
-  sortFn: (items: ChatNavItemModel[], options: SortFnOptions) => ChatNavItemModel[]
-  wrap: boolean
-  getActionsFn?: (contexts: DocNotifyContext[]) => Action[]
-  maxSectionItems?: number
-  isPinned: boolean
-  _class?: Ref<Class<Doc>>
-  skipClasses?: Array<Ref<Class<Doc>>>
-}
-
-export interface ChatNavItemModel {
-  id: Ref<Doc>
-  object: Doc
-  title: string
-  description?: string
-  icon: Asset | AnySvelteComponent | undefined
-  iconSize?: IconSize
-  iconProps: Record<string, any>
-  withIconBackground: boolean
-}
-
-export interface SelectChannelEvent {
-  object: Doc
-}
+/**
+ * @public
+ */
+export const AVATAR_COLORS: ColorDefinition[] = [
+  { name: 'blue', color: '#4674ca' }, // blue
+  { name: 'blue_dark', color: '#315cac' }, // blue_dark
+  { name: 'green', color: '#57be8c' }, // green
+  { name: 'green_dark', color: '#3fa372' }, // green_dark
+  { name: 'yellow_orange', color: '#f9a66d' }, // yellow_orange
+  { name: 'red', color: '#ec5e44' }, // red
+  { name: 'red_dark', color: '#e63717' }, // red_dark
+  { name: 'pink', color: '#f868bc' }, // pink
+  { name: 'purple', color: '#6c5fc7' }, // purple
+  { name: 'purple_dark', color: '#4e3fb4' }, // purple_dark
+  { name: 'teal', color: '#57b1be' }, // teal
+  { name: 'gray', color: '#847a8c' } // gray
+]

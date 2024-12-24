@@ -1,30 +1,33 @@
-# Docker Compose dev image
+# Overview
 
-## Running platform inside docker compose
+Package allow to create a client to interact with running platform.
 
-```bash
-rush build
-rush bundle
-rush docker:build
-docker compose up -d --force-recreate
+## Usage
+
+```ts
+  import clientResources from '@hcengineering/client-resources'
+  import core, { Client } from '@hcengineering/core'
+
+  // ...
+
+  const token = ... // Token obtained somehow.
+
+  const connection: Client = await (await clientResources()).function.GetClient(token, transactorUrl)
+
+  // Now client is usable
+
+  // Use close, to shutdown connection.
+  await connection.close()
 ```
 
-## Running ElasticVUE to check elastic intance
+## Node JS
 
-```bash
-docker run -p 8082:8080 -d cars10/elasticvue
+For NodeJS environment it is required to configure ClientSocketFactory using 'ws' package.
+
+```ts
+// We need to override default WebSocket factory with 'ws' one.
+setMetadata(client.metadata.ClientSocketFactory, (url) => new WebSocket(url))
+
+const connection: Client = await (await clientResources()).function.GetClient(token, transactorUrl)
+...
 ```
-
-## Running Local NPM registry with Docker
-
-```bash
-docker run -it --rm --name verdaccio -p 4873:4873 verdaccio/verdaccio
-```
-
-```bash
-npm set registry http://localhost:4873
-npm adduser
-npm login
-```
-
-Verdaccio will be available via HTTP http://localhost:4873

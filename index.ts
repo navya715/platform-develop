@@ -13,84 +13,35 @@
 // limitations under the License.
 //
 
-import type { AccountClient, ClientConnectEvent, MeasureContext, TxPersistenceStore } from '@hcengineering/core'
-import { type Plugin, type Resource, type Metadata, plugin } from '@hcengineering/platform'
-/**
- * @public
- */
-export const clientId = 'client' as Plugin
+import { addStringsLoader, loadMetadata } from '@hcengineering/platform'
+import contact, { contactId } from '@hcengineering/contact'
 
-/**
- * @public
- */
-export type ClientSocketFactory = (url: string) => ClientSocket
-
-/**
- * @public
- */
-export interface ClientSocket {
-  onmessage?: ((this: ClientSocket, ev: MessageEvent) => any) | null
-  onclose?: ((this: ClientSocket, ev: CloseEvent) => any) | null
-  onopen?: ((this: ClientSocket, ev: Event) => any) | null
-  onerror?: ((this: ClientSocket, ev: Event) => any) | null
-
-  send: (data: string | ArrayBufferLike | Blob | ArrayBufferView) => void
-
-  close: (code?: number) => void
-
-  readyState: ClientSocketReadyState
-
-  bufferedAmount?: number
-}
-
-/**
- * @public
- */
-export enum ClientSocketReadyState {
-  CONNECTING = 0,
-  OPEN = 1,
-  CLOSING = 2,
-  CLOSED = 3
-}
-
-export interface ClientFactoryOptions {
-  socketFactory?: ClientSocketFactory
-  useBinaryProtocol?: boolean
-  useProtocolCompression?: boolean
-  connectionTimeout?: number
-  onHello?: (serverVersion?: string) => boolean
-  onUpgrade?: () => void
-  onUnauthorized?: () => void
-  onArchived?: () => void
-  onConnect?: (event: ClientConnectEvent, data: any) => Promise<void>
-  ctx?: MeasureContext
-  onDialTimeout?: () => void | Promise<void>
-}
-
-/**
- * @public
- */
-export type ClientFactory = (token: string, endpoint: string, opt?: ClientFactoryOptions) => Promise<AccountClient>
-
-// client - will filter out all server model elements
-// It will also filter out all UI Elements, like Actions, View declarations etc.
-// ui - will filter out all server element's and all UI disabled elements.
-export type FilterMode = 'none' | 'client' | 'ui'
-
-export default plugin(clientId, {
-  metadata: {
-    ClientSocketFactory: '' as Metadata<ClientSocketFactory>,
-    FilterModel: '' as Metadata<FilterMode>,
-    ExtraPlugins: '' as Metadata<Plugin[]>,
-    UseBinaryProtocol: '' as Metadata<boolean>,
-    UseProtocolCompression: '' as Metadata<boolean>,
-    ConnectionTimeout: '' as Metadata<number>,
-    OverridePersistenceStore: '' as Metadata<TxPersistenceStore>
-  },
-  function: {
-    GetClient: '' as Resource<ClientFactory>
-  },
-  event: {
-    NetworkRequests: '' as Metadata<string>
-  }
+const icons = require('../assets/icons.svg') as string // eslint-disable-line
+loadMetadata(contact.icon, {
+  ContactApplication: `${icons}#contactapplication`,
+  Phone: `${icons}#phone`,
+  Email: `${icons}#email`,
+  Discord: `${icons}#discord`,
+  Facebook: `${icons}#facebook`,
+  Instagram: `${icons}#instagram`,
+  LinkedIn: `${icons}#linkedin`,
+  Telegram: `${icons}#telegram`,
+  Twitter: `${icons}#twitter`,
+  VK: `${icons}#vk`,
+  WhatsApp: `${icons}#whatsapp`,
+  Skype: `${icons}#skype`,
+  Youtube: `${icons}#youtube`,
+  GitHub: `${icons}#github`,
+  Edit: `${icons}#edit`,
+  Person: `${icons}#person`,
+  Persona: `${icons}#persona`,
+  Company: `${icons}#company`,
+  SocialEdit: `${icons}#social-edit`,
+  Homepage: `${icons}#homepage`,
+  Whatsapp: `${icons}#whatsapp`,
+  Profile: `${icons}#profile`,
+  KickUser: `${icons}#kickUser`,
+  ComponentMembers: `${icons}#componentMembers`,
+  Contacts: `${icons}#contacts`
 })
+addStringsLoader(contactId, async (lang: string) => await import(`../lang/${lang}.json`))

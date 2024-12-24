@@ -1,31 +1,14 @@
 {
-  "name": "@hcengineering/client",
+  "name": "@hcengineering/contact-assets",
   "entries": [
     {
-      "version": "0.6.1",
-      "tag": "@hcengineering/client_v0.6.1",
-      "date": "Sun, 08 Aug 2021 21:05:26 GMT",
-      "comments": {
-        "patch": [
-          {
-            "comment": "Fix server connection"
-          }
-        ],
-        "dependency": [
-          {
-            "comment": "Updating dependency \"@hcengineering/core\" from `~0.6.0` to `~0.6.8`"
-          }
-        ]
-      }
-    },
-    {
       "version": "0.6.0",
-      "tag": "@hcengineering/client_v0.6.0",
-      "date": "Sun, 08 Aug 2021 10:14:57 GMT",
+      "tag": "@hcengineering/contact-assets_v0.6.0",
+      "date": "Tue, 09 Nov 2021 17:01:22 GMT",
       "comments": {
         "dependency": [
           {
-            "comment": "Updating dependency \"@hcengineering/platform\" from `~0.6.3` to `~0.6.4`"
+            "comment": "Updating dependency \"@hcengineering/contact\" from `~0.6.0` to `~0.6.2`"
           }
         ]
       }
